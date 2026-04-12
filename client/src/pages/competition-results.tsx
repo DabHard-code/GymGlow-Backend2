@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getAuthHeaders } from "@/lib/queryClient";
 import { Link, useParams } from "wouter";
 import { Trophy, ArrowLeft, Sparkles } from "lucide-react";
 
@@ -37,6 +38,7 @@ type ResultsResponse =
           };
       top10: { rank: number; displayName: string; avgTop2: number; best: number; second: number }[];
       message: string;
+      coachRecap: string;
     };
 
 function fmtDateRange(a: Date, b: Date) {
@@ -70,7 +72,7 @@ export default function CompetitionResultsPage() {
     queryKey: ["/api/competition/results", profileId],
     enabled: Boolean(profileId),
     queryFn: async () => {
-      const res = await fetch(`/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`);
+      const res = await fetch(`/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`, { headers: await getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load results");
       return res.json();
     },

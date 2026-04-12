@@ -884,11 +884,6 @@ export class DatabaseStorage implements IStorage {
       },
 ] as const;
 
-    if (!drillData || drillData.length === 0) {
-      console.log("⚠️ No drill seed data found. Skipping drill seed.");
-      return;
-    }
-
     await db.insert(drills).values(drillData as any);
     console.log(`Seeded ${drillData.length} drills successfully`);
 
@@ -1073,7 +1068,7 @@ export class DatabaseStorage implements IStorage {
 
     const rows: { athleteId: string; points: number; challengesCompleted: number; aiBonus: number }[] = [];
 
-    for (const [athleteId, entry] of byAthlete.entries()) {
+    for (const [athleteId, entry] of Array.from(byAthlete.entries())) {
       const challengesCompleted = entry.challenges.size;
 
       const base = challengesCompleted * 100;
@@ -1129,7 +1124,7 @@ export class DatabaseStorage implements IStorage {
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const challengeData: InsertChallenge[] = [
+    const challengeData = [
       {
         id: "ch_weekly_handstand_hold",
         name: "Handstand Hold Challenge (3s)",
@@ -1434,11 +1429,6 @@ export class DatabaseStorage implements IStorage {
       return d ? ({ ...s, ...d } as any) : (s as any);
     });
 
-
-    if (!skillData || skillData.length === 0) {
-      console.log("⚠️ No skill seed data found. Skipping skill seed.");
-      return;
-    }
 
     await db.insert(skills).values(enrichedSkillData as any);
     console.log(`Seeded ${skillData.length} skills successfully`);

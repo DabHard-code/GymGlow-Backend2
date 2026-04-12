@@ -271,14 +271,9 @@ setTimeout(() => {
           title: data.title,
         });
         return (await response.json()) as { sessionId: string; status: string };
-      } else {
-        const response = await apiRequest("POST", "/api/analyze", {
-          exerciseType,
-          videoPath: data.videoPath,
-          title: data.title,
-        });
-        return (await response.json()) as AnalysisResult;
       }
+
+      throw new Error("Please choose an athlete profile before starting analysis.");
     },
     onSuccess: (data) => {
       if ("sessionId" in data) {
@@ -373,7 +368,7 @@ setTimeout(() => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <Button variant="ghost" onClick={onBack} disabled={isAnalyzing} data-testid="button-back">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              {profileId ? "Back to Profile" : "New Video"}
+              {profileId ? "Back to Profile" : "Choose Profile"}
             </Button>
 
             {profileId && sport ? (

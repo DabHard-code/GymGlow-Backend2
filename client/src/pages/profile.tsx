@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { VideoUploadZone } from "@/components/video-upload-zone";
 import { AnalysisView } from "@/components/analysis-view";
 import { FeedbackPanel } from "@/components/feedback-panel";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 import {
   type SportProfile,
@@ -100,7 +101,8 @@ function AnalysisCard({
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
+  const headers = await getAuthHeaders();
+  const res = await fetch(url, { credentials: "include", headers });
 
   // If auth redirects or HTML happens, this catches it
   const contentType = res.headers.get("content-type") || "";

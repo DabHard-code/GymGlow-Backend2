@@ -1,0 +1,28 @@
+GymGlow updates-only patch
+
+Included files:
+- tsconfig.json
+- vite.config.ts
+- client/src/pages/competition-results.tsx
+- client/src/pages/notification-settings.tsx
+- client/src/pages/challenges.tsx
+- client/src/components/analysis-view.tsx
+- server/routes.ts
+- server/storage.ts
+
+What changed:
+- removed deprecated/broken tsconfig ignoreDeprecations setting
+- kept path aliases working without baseUrl
+- added Vite manual vendor chunking
+- fixed competition results coachRecap type + API response mismatch
+- made notification settings page work locally instead of calling missing API routes
+- prevented no-profile analysis from calling dead /api/analyze route
+- moved challenge uploads off base64 to Supabase storage path uploads
+- added challenge ownership checks and protected submission status reads
+- delayed trial-credit consumption until successful analysis creation
+- cleaned up uploaded video on failed analysis and on challenge processing completion
+- fixed storage.ts TypeScript issues
+
+Verification:
+- tsc --noEmit passes in this environment
+- npm run build could not be fully verified here because the uploaded project's local tsx binary is not executable in this container (Permission denied)

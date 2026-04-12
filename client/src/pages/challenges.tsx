@@ -243,19 +243,6 @@ function SubmitChallengeDialog({
     ? profiles.find((p) => p.sport === challenge.sport)
     : undefined;
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(",")[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-    });
-  };
-
   const submitMutation = useMutation({
     mutationFn: async ({
       challengeId,
@@ -275,10 +262,19 @@ function SubmitChallengeDialog({
       const user = data.session?.user;
       if (!user) throw new Error("401: Not authenticated – no Supabase user session");
 
-      // Server challenge-submit endpoint expects JSON w/ base64 (videoData)
-      const videoData = await fileToBase64(videoFile);
+            const objectPath = `${user.id}/${profileId}/challenge_${Date.now()}_${videoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("Videos")
+        .upload(objectPath, videoFile, {
+          contentType: videoFile.type || "video/mp4",
+          upsert: false,
+        });
 
-      const payload: any = { athleteId, profileId, videoData };
+      if (uploadErr) {
+        throw new Error(`Upload failed: ${uploadErr.message}`);
+      }
+
+      const payload: any = { athleteId, profileId, videoPath: objectPath };
       if (skillId) payload.skillId = skillId;
 
       const res = await fetch(`/api/challenges/${challengeId}/submit`, {
@@ -323,7 +319,17 @@ onSuccess: (data) => {
 
     const poll = async () => {
       try {
-        const response = await fetch(`/api/submissions/${submissionId}`);
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const user = data.session?.user;
+        if (!user) throw new Error("Not authenticated");
+
+        const response = await fetch(`/api/submissions/${submissionId}`, {
+          headers: {
+            "x-user-id": user.id,
+            ...(user.email ? { "x-user-email": user.email } : {}),
+          },
+        });
         const submission = await response.json();
 
         if (submission.status === "scored") {
@@ -352,7 +358,7 @@ onSuccess: (data) => {
           setSubmissionStatus("error");
           toast({
             title: "Analysis Failed",
-            description: "There was an error analyzing your video",
+            description: submission.feedback || "There was an error analyzing your video",
             variant: "destructive",
           });
           return;

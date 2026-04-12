@@ -149,7 +149,14 @@ function Router() {
           </Protected>
         )}
       />
-      <Route path="/settings" component={SettingsPage} />
+      <Route
+        path="/settings"
+        component={() => (
+          <Protected>
+            <SettingsPage />
+          </Protected>
+        )}
+      />
 
       <Route path="/notification-settings">
   <Protected>

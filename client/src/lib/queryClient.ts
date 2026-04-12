@@ -9,7 +9,7 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // ✅ Ask Supabase for the currently logged-in user's ID + email
-async function getCurrentUserInfo(): Promise<
+export async function getCurrentUserInfo(): Promise<
   { id: string; email: string | null } | null
 > {
   const { data, error } = await supabase.auth.getSession();
@@ -25,24 +25,32 @@ async function getCurrentUserInfo(): Promise<
   return { id: user.id, email: user.email ?? null };
 }
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const user = await getCurrentUserInfo();
+  if (!user) {
+    throw new Error("401: Not authenticated – no Supabase user session");
+  }
+
+  return {
+    "x-user-id": user.id,
+    ...(user.email ? { "x-user-email": user.email } : {}),
+  };
+}
+
 // ✅ Helper for POST/PUT/DELETE/etc
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const user = await getCurrentUserInfo();
-  if (!user) {
-    throw new Error("401: Not authenticated – no Supabase user session");
-  }
+  const headers = await getAuthHeaders();
 
   const res = await fetch(url, {
     method,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "x-user-id": user.id,
-      ...(user.email ? { "x-user-email": user.email } : {}),
+      ...headers,
     },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
@@ -90,12 +98,25 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 0,
+      gcTime: 1000 * 60 * 5,
+      retry: 1,
     },
     mutations: {
       retry: false,
     },
   },
+});
+
+
+// Keep React Query in sync with auth state so protected data doesn't get stuck empty
+supabase.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") {
+    queryClient.clear();
+    return;
+  }
+
+  queryClient.invalidateQueries();
 });

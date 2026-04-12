@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getAuthHeaders } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { ArrowLeft, Award, Lock } from "lucide-react";
 
@@ -135,7 +136,7 @@ export default function BadgesPage({ params }: { params: { athleteId: string } }
     queryFn: async () => {
       const qs = new URLSearchParams();
       qs.set("profileId", String(profileId));
-      const res = await fetch(`/api/competition/status?${qs.toString()}`);
+      const res = await fetch(`/api/competition/status?${qs.toString()}`, { headers: await getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load competition status");
       return res.json();
     },
@@ -184,7 +185,7 @@ export default function BadgesPage({ params }: { params: { athleteId: string } }
       const qs = new URLSearchParams();
       qs.set("sport", sport);
       if (level) qs.set("level", level);
-      const res = await fetch(`/api/athletes/${athleteId}/badge-progress?${qs.toString()}`);
+      const res = await fetch(`/api/athletes/${athleteId}/badge-progress?${qs.toString()}`, { headers: await getAuthHeaders() });
       if (!res.ok) throw new Error("Failed to load badge progress");
       return res.json();
     },

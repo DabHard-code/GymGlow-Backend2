@@ -136,7 +136,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  
+  app.get("/api/version", (_req, res) => {
+    res.json({ version: "v8411-copy-patched-auth-2026-04-02" });
+  });
+
   /* ==================== USER / BILLING (MVP) ==================== */
 
   // Returns current user (including plan). Used for paywalls in the app.
@@ -507,20 +510,100 @@ app.get("/billing/portal", async (req, res) => {
   });
 
   app.get("/api/athletes/:athleteId/profiles", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const athlete = await storage.getAthlete(req.params.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
     res.json(await storage.getProfilesByAthlete(req.params.athleteId));
   });
 
   // ✅ MISSING ROUTE (this is what your frontend is calling and getting 404)
   app.get("/api/profiles/:profileId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const profile = await storage.getProfile(req.params.profileId);
     if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
     res.json(profile);
   });
 
   app.post("/api/profiles", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const parsed = createProfileSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const athlete = await storage.getAthlete(parsed.data.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(403).json({ error: "You do not have access to that athlete." });
+    }
+
     res.status(201).json(await storage.createProfile(parsed.data));
+  });
+
+  app.put("/api/athletes/:athleteId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const athlete = await storage.getAthlete(req.params.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
+    const parsed = createAthleteSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const updated = await storage.updateAthlete(req.params.athleteId, parsed.data);
+    if (!updated) return res.status(404).json({ error: "Athlete not found" });
+    res.json(updated);
+  });
+
+  app.patch("/api/profiles/:profileId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const profile = await storage.getProfile(req.params.profileId);
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const parsed = createProfileSchema.pick({ level: true, metadata: true }).partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const updated = await storage.updateProfile(req.params.profileId, parsed.data);
+    if (!updated) return res.status(404).json({ error: "Profile not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/profiles/:profileId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const profile = await storage.getProfile(req.params.profileId);
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const ok = await storage.deleteProfile(req.params.profileId);
+    if (!ok) return res.status(404).json({ error: "Profile not found" });
+    res.json({ success: true });
   });
 
 
@@ -750,8 +833,12 @@ app.get("/billing/portal", async (req, res) => {
   const profile = await storage.getProfile(profileId);
   if (!profile) return res.status(404).json({ error: "Profile not found" });
 
+  const athlete = await storage.getAthlete(profile.athleteId);
+  if (!athlete || athlete.userId !== userId) {
+    return res.status(403).json({ error: "You do not have access to that profile" });
+  }
+
   const isTrial = !hasPaidAccess && canUseTrial;
-  if (isTrial) await storage.consumeTrialCredit(userId);
 
   const session = await storage.createSession({
     profileId,
@@ -802,6 +889,10 @@ app.get("/billing/portal", async (req, res) => {
         progressionTips: result.progressionTips || null,
       });
 
+      if (isTrial) {
+        await storage.consumeTrialCredit(userId);
+      }
+
       if (!isTrial && result.awardedBadges?.length) {
         await storage.awardBadges(
           result.awardedBadges.map((badgeType) => ({
@@ -817,6 +908,7 @@ app.get("/billing/portal", async (req, res) => {
     } catch (err) {
       console.error("ANALYSIS ERROR:", err);
 
+      await supabaseAdmin.storage.from("Videos").remove([videoPath]).catch(() => undefined);
       await storage.updateSession(sessionId, {
         status: "error",
         errorMessage: err instanceof Error ? err.message : String(err),
@@ -1139,7 +1231,11 @@ app.get("/billing/portal", async (req, res) => {
     athleteId: z.string(),
     profileId: z.string(),
     skillId: z.string().optional(),
-    videoData: z.string().min(1), // base64
+    videoData: z.string().min(1).optional(),
+    videoPath: z.string().min(1).optional(),
+  }).refine((data) => Boolean(data.videoData || data.videoPath), {
+    message: "videoPath or videoData is required",
+    path: ["videoPath"],
   });
 
   app.post("/api/challenges/:id/submit", async (req, res) => {
@@ -1152,7 +1248,17 @@ app.get("/billing/portal", async (req, res) => {
     const parsed = submitChallengeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
 
-    const { athleteId, profileId, videoData, skillId } = parsed.data;
+    const { athleteId, profileId, videoData, videoPath, skillId } = parsed.data;
+
+    const athlete = await storage.getAthlete(athleteId);
+    if (!athlete || athlete.userId !== auth.userId) {
+      return res.status(403).json({ error: "You do not have access to that athlete." });
+    }
+
+    const profile = await storage.getProfile(profileId);
+    if (!profile || profile.athleteId !== athleteId) {
+      return res.status(400).json({ error: "Profile does not belong to the selected athlete." });
+    }
 
     // Challenge must be configured with a target skill (GymGlow v1)
     if (!challenge.targetSkillId) {
@@ -1193,7 +1299,7 @@ app.get("/billing/portal", async (req, res) => {
       athleteId,
       profileId,
       skillId: challenge.targetSkillId,
-      videoUrl: null,
+      videoUrl: videoPath ?? null,
       status: "analyzing",
       feedback: null,
       score: null,
@@ -1204,9 +1310,23 @@ app.get("/billing/portal", async (req, res) => {
     setImmediate(async () => {
       let tempFile: string | null = null;
       try {
-        // Write base64 to temp mp4
         tempFile = path.join(os.tmpdir(), `challenge_${randomUUID()}.mp4`);
-        fs.writeFileSync(tempFile, Buffer.from(videoData, "base64"));
+
+        if (videoPath) {
+          const { data, error } = await supabaseAdmin.storage
+            .from("Videos")
+            .download(videoPath);
+
+          if (error) throw new Error(`Storage download failed: ${error.message}`);
+          if (!data) throw new Error("Storage download failed: no data");
+
+          const arrayBuffer = await data.arrayBuffer();
+          await fs.promises.writeFile(tempFile, Buffer.from(arrayBuffer));
+        } else if (videoData) {
+          fs.writeFileSync(tempFile, Buffer.from(videoData, "base64"));
+        } else {
+          throw new Error("No challenge video received");
+        }
 
         const sport = challenge.sport as SportType;
         const requiredSkill = await storage.getSkill(challenge.targetSkillId!);
@@ -1277,6 +1397,9 @@ app.get("/billing/portal", async (req, res) => {
           feedback: err?.message || "Challenge analysis failed",
         } as any);
       } finally {
+        if (videoPath) {
+          await supabaseAdmin.storage.from("Videos").remove([videoPath]).catch(() => undefined);
+        }
         if (tempFile) {
           try {
             fs.unlinkSync(tempFile);
@@ -1289,8 +1412,17 @@ app.get("/billing/portal", async (req, res) => {
   });
 
   app.get("/api/submissions/:id", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const submission = await storage.getChallengeSubmission(req.params.id);
     if (!submission) return res.status(404).json({ error: "Not found" });
+
+    const athlete = await storage.getAthlete(submission.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(403).json({ error: "You do not have access to that submission" });
+    }
+
     res.json(submission);
   });
 
@@ -1514,11 +1646,19 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
 
   // Lightweight status endpoint used by the Badges page (to show Crimson filter only on Comp Week)
   app.get("/api/competition/status", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const profileId = String(req.query.profileId || "");
     if (!profileId) return res.status(400).json({ error: "profileId is required" });
 
     const profile = await storage.getProfile(profileId);
     if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
 
     const now = new Date();
     const { weekStart, weekEnd } = getWeekWindowSundayFor(now);
@@ -1539,6 +1679,9 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
   });
 
   app.get("/api/competition/results", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const profileId = String(req.query.profileId || "");
     const viewerAthleteId = String(req.query.viewerAthleteId || "");
 
@@ -1546,6 +1689,11 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
 
     const profile = await storage.getProfile(profileId);
     if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
 
     // Results are always for the *last completed* week.
     const now = new Date();
@@ -1678,6 +1826,7 @@ res.json({
       message: viewerRow
         ? (rank === 1 ? "🏆 You took #1 this week!" : `You finished #${rank} this week.`)
         : "No uploads counted this week.",
+      coachRecap,
     });
   });
 
