@@ -408,14 +408,17 @@ setTimeout(() => {
             <div className="lg:w-3/5 p-4 lg:p-6 flex flex-col">
               <div className="flex-1 flex items-center justify-center">
                 <div className="w-full max-w-4xl">
-                  <VideoPlayer videoUrl={videoUrl} />
+                  <VideoPlayer videoUrl={videoUrl} filename={videoFile.name} />
                 </div>
               </div>
 
-              <div className="mt-4 text-center">
+              <div className="mt-4 space-y-2 text-center">
                 <p className="text-sm text-muted-foreground">
                   <span className="font-medium">{videoFile.name}</span>{" "}
                   ({(videoFile.size / (1024 * 1024)).toFixed(1)} MB)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  4K and newer phone formats may not preview perfectly here, but GymGlow will optimize them before analysis.
                 </p>
               </div>
             </div>

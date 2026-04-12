@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAuthHeaders } from "@/lib/queryClient";
 import { Link, useParams } from "wouter";
 import { Trophy, ArrowLeft, Sparkles } from "lucide-react";
 
@@ -72,7 +71,7 @@ export default function CompetitionResultsPage() {
     queryKey: ["/api/competition/results", profileId],
     enabled: Boolean(profileId),
     queryFn: async () => {
-      const res = await fetch(`/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`, { headers: await getAuthHeaders() });
+      const res = await fetch(`/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`);
       if (!res.ok) throw new Error("Failed to load results");
       return res.json();
     },

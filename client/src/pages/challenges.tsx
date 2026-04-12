@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { VideoUploadZone } from "@/components/video-upload-zone";
+import { VideoPlayer } from "@/components/video-player";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
@@ -485,14 +486,13 @@ onSuccess: (data) => {
                 {videoFile && (
                   <div className="space-y-2">
                     <div className="rounded-lg overflow-hidden border bg-muted">
-                      <video
-                        controls
-                        className="w-full h-48 object-contain bg-black"
-                        src={previewUrl ?? undefined}
-                      />
+                      {previewUrl ? <VideoPlayer videoUrl={previewUrl} filename={videoFile.name} /> : null}
                     </div>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       Video ready for upload ({videoFile.name})
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      If preview looks black, keep going. GymGlow will optimize larger phone videos during processing.
                     </p>
                   </div>
                 )}
