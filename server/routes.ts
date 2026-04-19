@@ -140,6 +140,37 @@ export async function registerRoutes(
     res.json({ version: "v8411-copy-patched-auth-2026-04-02" });
   });
 
+  app.post("/api/uploads/video/prepare", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    await storage.ensureUserFromAuth(userId);
+
+    const parsed = z.object({
+      fileName: z.string().min(1).optional(),
+      mimeType: z.string().min(1).optional(),
+      athleteId: z.string().min(1).optional(),
+      profileId: z.string().min(1).optional(),
+    }).safeParse(req.body ?? {});
+
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const extension = inferVideoExtension(parsed.data.fileName, parsed.data.mimeType);
+    const baseName = sanitizeUploadFileName(parsed.data.fileName).replace(/\.[^.]+$/, "");
+    const videoPath = [
+      userId,
+      parsed.data.athleteId || "unassigned-athlete",
+      parsed.data.profileId || "unassigned-profile",
+      `${Date.now()}_${baseName}${extension}`,
+    ].join("/");
+
+    return res.json({
+      bucket: "Videos",
+      videoPath,
+      contentType: parsed.data.mimeType || "video/mp4",
+    });
+  });
+
   /* ==================== USER / BILLING (MVP) ==================== */
 
   // Returns current user (including plan). Used for paywalls in the app.
@@ -1159,11 +1190,7 @@ app.get("/billing/portal", async (req, res) => {
     athleteId: z.string(),
     profileId: z.string(),
     skillId: z.string().optional(),
-    videoData: z.string().min(1).optional(),
-    videoPath: z.string().min(1).optional(),
-  }).refine((data) => Boolean(data.videoData || data.videoPath), {
-    message: "videoPath or videoData is required",
-    path: ["videoPath"],
+    videoPath: z.string().min(1),
   });
 
   app.post("/api/challenges/:id/submit", async (req, res) => {
@@ -1173,10 +1200,17 @@ app.get("/billing/portal", async (req, res) => {
     const challenge = await storage.getChallenge(req.params.id);
     if (!challenge) return res.status(404).json({ error: "Challenge not found" });
 
+    if (hasInlineVideoPayload(req.body)) {
+      return res.status(413).json({
+        error: "Inline video payloads are no longer accepted. Upload the file to Supabase Storage first, then send only videoPath.",
+        code: "INLINE_VIDEO_NOT_ALLOWED",
+      });
+    }
+
     const parsed = submitChallengeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
 
-    const { athleteId, profileId, videoData, videoPath, skillId } = parsed.data;
+    const { athleteId, profileId, videoPath, skillId } = parsed.data;
 
     const athlete = await storage.getAthlete(athleteId);
     if (!athlete || athlete.userId !== auth.userId) {
@@ -1240,21 +1274,15 @@ app.get("/billing/portal", async (req, res) => {
       try {
         tempFile = path.join(os.tmpdir(), `challenge_${randomUUID()}.mp4`);
 
-        if (videoPath) {
-          const { data, error } = await supabaseAdmin.storage
-            .from("Videos")
-            .download(videoPath);
+        const { data, error } = await supabaseAdmin.storage
+          .from("Videos")
+          .download(videoPath);
 
-          if (error) throw new Error(`Storage download failed: ${error.message}`);
-          if (!data) throw new Error("Storage download failed: no data");
+        if (error) throw new Error(`Storage download failed: ${error.message}`);
+        if (!data) throw new Error("Storage download failed: no data");
 
-          const arrayBuffer = await data.arrayBuffer();
-          await fs.promises.writeFile(tempFile, Buffer.from(arrayBuffer));
-        } else if (videoData) {
-          fs.writeFileSync(tempFile, Buffer.from(videoData, "base64"));
-        } else {
-          throw new Error("No challenge video received");
-        }
+        const arrayBuffer = await data.arrayBuffer();
+        await fs.promises.writeFile(tempFile, Buffer.from(arrayBuffer));
 
         const sport = challenge.sport as SportType;
         const requiredSkill = await storage.getSkill(challenge.targetSkillId!);
