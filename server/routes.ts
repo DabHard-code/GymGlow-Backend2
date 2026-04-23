@@ -828,8 +828,17 @@ app.get("/billing/portal", async (req, res) => {
       const ext = path.extname(videoPath || "") || ".mov";
       tempOriginal = path.join(os.tmpdir(), `video_${randomUUID()}${ext}`);
 
-      const arrayBuffer = await data.arrayBuffer();
-      await fs.promises.writeFile(tempOriginal, Buffer.from(arrayBuffer));
+      const stream = data.stream();
+
+      await new Promise<void>((resolve, reject) => {
+        const fileStream = fs.createWriteStream(tempOriginal!);
+
+        stream.pipe(fileStream);
+
+        stream.on("error", reject);
+        fileStream.on("error", reject);
+        fileStream.on("finish", resolve);
+      });
 
       tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
 
@@ -1281,8 +1290,16 @@ app.get("/billing/portal", async (req, res) => {
         if (error) throw new Error(`Storage download failed: ${error.message}`);
         if (!data) throw new Error("Storage download failed: no data");
 
-        const arrayBuffer = await data.arrayBuffer();
-        await fs.promises.writeFile(tempFile, Buffer.from(arrayBuffer));
+        const stream = data.stream();
+
+await new Promise((resolve, reject) => {
+  const fileStream = fs.createWriteStream(tempOriginal);
+
+  stream.pipe(fileStream);
+
+  stream.on("error", reject);
+  fileStream.on("finish", resolve);
+});
 
         const sport = challenge.sport as SportType;
         const requiredSkill = await storage.getSkill(challenge.targetSkillId!);
