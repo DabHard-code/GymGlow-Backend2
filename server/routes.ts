@@ -13,6 +13,8 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 
 import { analyzeChallengeVideoFilePath, analyzeVideoFilePath } from "./openai.js";
 import { supabaseAdmin } from "./supabase.js";
@@ -828,17 +830,13 @@ app.get("/billing/portal", async (req, res) => {
       const ext = path.extname(videoPath || "") || ".mov";
       tempOriginal = path.join(os.tmpdir(), `video_${randomUUID()}${ext}`);
 
-      const stream = data.stream();
+      const webStream = data.stream();
+      const nodeStream = Readable.fromWeb(webStream as any);
 
-      await new Promise<void>((resolve, reject) => {
-        const fileStream = fs.createWriteStream(tempOriginal!);
-
-        stream.pipe(fileStream);
-
-        stream.on("error", reject);
-        fileStream.on("error", reject);
-        fileStream.on("finish", resolve);
-      });
+      await pipeline(
+        nodeStream,
+        fs.createWriteStream(tempOriginal!),
+      );
 
       tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
 
