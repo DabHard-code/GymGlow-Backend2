@@ -20,6 +20,67 @@ import { analyzeChallengeVideoFilePath, analyzeVideoFilePath } from "./openai.js
 import { supabaseAdmin } from "./supabase.js";
 import { getStripe, getPriceIdForPlan, planFromPriceId, type PaidPlan } from "./stripe";
 
+/* ==================== VIDEO FILE DOWNLOAD HELPERS ==================== */
+
+function safeVideoExtension(videoPath: string | null | undefined): string {
+  const clean = String(videoPath || "").split("?")[0].toLowerCase();
+  const ext = path.extname(clean);
+  const allowed = new Set([".mp4", ".mov", ".m4v", ".webm", ".qt", ".hevc"]);
+  return allowed.has(ext) ? ext : ".mp4";
+}
+
+function looksLikeVideoHeader(header: Buffer): boolean {
+  // MP4/MOV/M4V usually has "ftyp" at byte 4.
+  if (header.length >= 12 && header.subarray(4, 8).toString("ascii") === "ftyp") return true;
+
+  // WebM/Matroska EBML header.
+  if (
+    header.length >= 4 &&
+    header[0] === 0x1a &&
+    header[1] === 0x45 &&
+    header[2] === 0xdf &&
+    header[3] === 0xa3
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+async function writeSupabaseBlobToVideoFile(data: Blob, outputPath: string): Promise<void> {
+  // Supabase storage .download() returns a Web Blob. Its stream is a Web ReadableStream,
+  // so convert it to a Node stream before writing.
+  await pipeline(
+    Readable.fromWeb(data.stream() as any),
+    fs.createWriteStream(outputPath),
+  );
+
+  const stats = await fs.promises.stat(outputPath);
+  if (!stats.size || stats.size < 1024) {
+    throw new Error(`Downloaded video is empty or too small (${stats.size} bytes).`);
+  }
+
+  const file = await fs.promises.open(outputPath, "r");
+  try {
+    const header = Buffer.alloc(Math.min(64, stats.size));
+    await file.read(header, 0, header.length, 0);
+
+    if (!looksLikeVideoHeader(header)) {
+      const preview = header
+        .toString("utf8")
+        .replace(/[^\x20-\x7E]/g, ".")
+        .slice(0, 80);
+
+      throw new Error(
+        `Downloaded file is not valid video data. Size=${stats.size} bytes. First bytes="${preview}". This usually means the frontend uploaded a bad blob or the storage path points to the wrong object.`,
+      );
+    }
+  } finally {
+    await file.close();
+  }
+}
+
+
 /* ==================== DRILL MATCHING HELPERS ==================== */
 
 function tokenize(text: string): string[] {
@@ -827,16 +888,10 @@ app.get("/billing/portal", async (req, res) => {
       if (error) throw new Error(`Storage download failed: ${error.message}`);
       if (!data) throw new Error("Storage download failed: no data");
 
-      const ext = path.extname(videoPath || "") || ".mov";
+      const ext = safeVideoExtension(videoPath);
       tempOriginal = path.join(os.tmpdir(), `video_${randomUUID()}${ext}`);
 
-      const webStream = data.stream();
-      const nodeStream = Readable.fromWeb(webStream as any);
-
-      await pipeline(
-        nodeStream,
-        fs.createWriteStream(tempOriginal!),
-      );
+      await writeSupabaseBlobToVideoFile(data, tempOriginal);
 
       tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
 
@@ -1277,9 +1332,11 @@ app.get("/billing/portal", async (req, res) => {
 
     // Process async
     setImmediate(async () => {
+      let tempOriginal: string | null = null;
       let tempFile: string | null = null;
       try {
-        tempFile = path.join(os.tmpdir(), `challenge_${randomUUID()}.mp4`);
+        const ext = safeVideoExtension(videoPath);
+        tempOriginal = path.join(os.tmpdir(), `challenge_${randomUUID()}${ext}`);
 
         const { data, error } = await supabaseAdmin.storage
           .from("Videos")
@@ -1288,16 +1345,9 @@ app.get("/billing/portal", async (req, res) => {
         if (error) throw new Error(`Storage download failed: ${error.message}`);
         if (!data) throw new Error("Storage download failed: no data");
 
-        const stream = data.stream();
+        await writeSupabaseBlobToVideoFile(data, tempOriginal);
 
-await new Promise((resolve, reject) => {
-  const fileStream = fs.createWriteStream(tempOriginal);
-
-  stream.pipe(fileStream);
-
-  stream.on("error", reject);
-  fileStream.on("finish", resolve);
-});
+        tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
 
         const sport = challenge.sport as SportType;
         const requiredSkill = await storage.getSkill(challenge.targetSkillId!);
