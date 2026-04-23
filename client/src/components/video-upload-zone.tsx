@@ -1,15 +1,20 @@
-// SAFE VIDEO UPLOAD (NO WEBM, NO CORRUPTION)
+// DROP-IN REPLACEMENT
 // client/src/components/video-upload-zone.tsx
 
 import { useRef } from "react";
+import { compressVideo } from "./video-compress";
 
 export function VideoUploadZone({ onVideoSelect, compact }: any) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFile = (file: File) => {
-    // Do NOT modify file
-    // Let backend handle conversion safely
-    onVideoSelect(file);
+  const handleFile = async (file: File) => {
+    try {
+      const processed = await compressVideo(file);
+      onVideoSelect(processed);
+    } catch (e) {
+      console.warn("Compression failed, using original");
+      onVideoSelect(file);
+    }
   };
 
   return (
