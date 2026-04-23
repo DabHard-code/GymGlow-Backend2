@@ -212,17 +212,22 @@ function SubmitChallengeDialog({
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const previewUrl = useMemo(() => {
-    if (!videoFile) return null;
-    return URL.createObjectURL(videoFile);
-  }, [videoFile]);
+useEffect(() => {
+  if (!videoFile) {
+    setPreviewUrl(null);
+    return;
+  }
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+  const url = URL.createObjectURL(videoFile);
+  setPreviewUrl(url);
+
+  return () => {
+    URL.revokeObjectURL(url);
+  };
+}, [videoFile]);
+
   const [submitting, setSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<
     "idle" | "uploading" | "analyzing" | "done" | "ineligible" | "error"
