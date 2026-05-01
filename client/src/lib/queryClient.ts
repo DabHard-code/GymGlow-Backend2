@@ -15,6 +15,51 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function safeFallbackForUrl(url: string): unknown {
+  const cleanUrl = url.split("?")[0];
+
+  // List endpoints used by Home/Profile/Leaderboard must be arrays,
+  // otherwise pages can crash on .map(), .length, etc.
+  if (
+    cleanUrl.endsWith("/api/athletes") ||
+    cleanUrl.includes("/analyses") ||
+    cleanUrl.includes("/profiles") ||
+    cleanUrl.includes("/challenges") ||
+    cleanUrl.includes("/badges") ||
+    cleanUrl.includes("/meets") ||
+    cleanUrl.includes("/seasons")
+  ) {
+    return [];
+  }
+
+  // Points/leaderboard endpoints should return stable object shapes.
+  if (cleanUrl.includes("/api/points/hub")) {
+    return {
+      totalPoints: 0,
+      challengeCount: 0,
+      basePoints: 0,
+      aiBonus: 0,
+      allChallengesBonus: 0,
+      recentActivity: [],
+    };
+  }
+
+  if (cleanUrl.includes("/api/leaderboard/weekly")) {
+    return {
+      rankings: [],
+      yourRank: null,
+      totalPlayers: 0,
+    };
+  }
+
+  // Current user may legitimately be unavailable while auth loads.
+  if (cleanUrl.endsWith("/api/users/me")) {
+    return null;
+  }
+
+  return null;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -46,28 +91,33 @@ type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn =
   <T = unknown>(options: { on401: UnauthorizedBehavior }): QueryFunction<T | null> =>
   async ({ queryKey }) => {
+    const url = String(queryKey[0]);
     const authHeaders = await getAuthHeaders();
 
     try {
-      const res = await fetch(queryKey[0] as string, {
+      const res = await fetch(url, {
         headers: {
           ...authHeaders,
         },
         credentials: "include",
       });
 
-      if (res.status === 401) {
-        if (options.on401 === "returnNull") return null;
-        await throwIfResNotOk(res);
+      if (res.status === 401 && options.on401 === "returnNull") {
+        return safeFallbackForUrl(url) as T;
       }
 
       await throwIfResNotOk(res);
-      return (await res.json()) as T;
+
+      // Some endpoints may return 204/no body.
+      const text = await res.text();
+      if (!text) return safeFallbackForUrl(url) as T;
+
+      return JSON.parse(text) as T;
     } catch (error) {
-      console.error("Query request failed:", queryKey[0], error);
+      console.error("Query request failed:", url, error);
 
       if (options.on401 === "returnNull") {
-        return null;
+        return safeFallbackForUrl(url) as T;
       }
 
       throw error;
