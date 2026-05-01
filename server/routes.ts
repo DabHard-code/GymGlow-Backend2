@@ -1034,7 +1034,16 @@ app.get("/billing/portal", async (req, res) => {
 
       await writeSupabaseBlobToVideoFile(data, tempOriginal);
 
-      tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
+      const alreadyOptimized =
+        videoPath.toLowerCase().endsWith("_optimized.mp4") ||
+        videoPath.toLowerCase().includes("_optimized.");
+
+      if (alreadyOptimized) {
+        console.log("Skipping second transcode for already optimized video:", videoPath);
+        tempFile = tempOriginal;
+      } else {
+        tempFile = await transcodeTo1080pH264Mp4(tempOriginal);
+      }
 
       const result = await analyzeVideoFilePath(tempFile, sportType);
 
@@ -1075,8 +1084,8 @@ await storage.updateSession(sessionId, { status: "ready" });
         errorMessage: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      // cleanup temp files
-      for (const p of [tempFile, tempOriginal]) {
+      // cleanup temp files; avoid trying to delete the same file twice when transcode is skipped
+      for (const p of Array.from(new Set([tempFile, tempOriginal]))) {
         if (!p) continue;
         try {
           await fs.promises.unlink(p);
