@@ -517,6 +517,27 @@ export const insertChallengeSubmissionSchema = createInsertSchema(challengeSubmi
 export type InsertChallengeSubmission = z.infer<typeof insertChallengeSubmissionSchema>;
 export type ChallengeSubmission = typeof challengeSubmissions.$inferSelect;
 
+export const competitionPoints = pgTable("competition_points", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  athleteId: varchar("athlete_id").notNull().references(() => athletes.id),
+  profileId: varchar("profile_id").notNull().references(() => sportProfiles.id),
+  seasonId: varchar("season_id"),
+  sourceType: text("source_type").notNull(),
+  sourceId: varchar("source_id").notNull(),
+  points: integer("points").notNull(),
+  reason: text("reason").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCompetitionPointSchema = createInsertSchema(competitionPoints).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCompetitionPoint = z.infer<typeof insertCompetitionPointSchema>;
+export type CompetitionPoint = typeof competitionPoints.$inferSelect;
+
 export const skillStatuses = ["working_on", "consistent", "needs_help"] as const;
 export type SkillStatus = (typeof skillStatuses)[number];
 
@@ -650,28 +671,6 @@ export const insertSeasonSchema = createInsertSchema(seasons).omit({
 
 export type InsertSeason = z.infer<typeof insertSeasonSchema>;
 export type Season = typeof seasons.$inferSelect;
-
-
-export const competitionPoints = pgTable("competition_points", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  athleteId: varchar("athlete_id").notNull().references(() => athletes.id),
-  profileId: varchar("profile_id").notNull().references(() => sportProfiles.id),
-  seasonId: varchar("season_id").references(() => seasons.id),
-  sourceType: text("source_type").notNull(),
-  sourceId: varchar("source_id").notNull(),
-  points: integer("points").notNull(),
-  reason: text("reason").notNull(),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertCompetitionPointSchema = createInsertSchema(competitionPoints).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertCompetitionPoint = z.infer<typeof insertCompetitionPointSchema>;
-export type CompetitionPoint = typeof competitionPoints.$inferSelect;
 
 export const meets = pgTable("meets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

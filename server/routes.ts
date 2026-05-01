@@ -1060,6 +1060,19 @@ app.get("/billing/portal", async (req, res) => {
         progressionTips: result.progressionTips || null,
       });
 
+      await storage.awardCompetitionPoints({
+        athleteId,
+        profileId,
+        sourceType: "analysis",
+        sourceId: analysis.id,
+        points: 10,
+        reason: "analysis_upload",
+        metadata: {
+          score: result.overallScore,
+          sessionId,
+        },
+      }).catch(() => undefined);
+
       if (isTrial) {
         await storage.consumeTrialCredit(userId);
       }
@@ -1570,15 +1583,44 @@ await storage.updateSession(sessionId, { status: "ready" });
             `Coach Notes: ${gated.feedback}\n\n` +
             `Tie-breaker: ${tieBreaker}`,
         } as any);
+
+        await storage.awardCompetitionPoints({
+          athleteId,
+          profileId,
+          sourceType: "challenge",
+          sourceId: challenge.id,
+          points: 50,
+          reason: "challenge_submission",
+          metadata: {
+            submissionId: submission.id,
+            score: finalScore,
+            status: "scored",
+          },
+        }).catch(() => undefined);
+
+        const challengeScoreBonus = Math.floor(finalScore / 10) * 5;
+        if (challengeScoreBonus > 0) {
+          await storage.awardCompetitionPoints({
+            athleteId,
+            profileId,
+            sourceType: "challenge",
+            sourceId: challenge.id,
+            points: challengeScoreBonus,
+            reason: "challenge_score_bonus",
+            metadata: {
+              submissionId: submission.id,
+              score: finalScore,
+              status: "scored",
+            },
+          }).catch(() => undefined);
+        }
       } catch (err: any) {
         await storage.updateChallengeSubmission(submission.id, {
           status: "error",
           feedback: err?.message || "Challenge analysis failed",
         } as any);
       } finally {
-        if (videoPath) {
-          await supabaseAdmin.storage.from("Videos").remove([videoPath]).catch(() => undefined);
-        }
+        // Keep challenge video in Supabase for playback/history/debugging.
         if (tempFile) {
           try {
             fs.unlinkSync(tempFile);
@@ -1666,85 +1708,20 @@ app.get("/api/points/hub", async (req, res) => {
   if (!profileId) return res.status(400).json({ error: "Missing profileId" });
   if (!athleteId) return res.status(400).json({ error: "Missing athleteId" });
 
+  const access = await requireProfileAccess(req, res, profileId);
+  if (!access) return;
+
+  if (access.athlete.id !== athleteId) {
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
   const { weekStart, weekEnd } = getWeekWindowSundayFor(new Date());
-
-  const submissions = await db
-    .select({
-      challengeId: submissionsTable.challengeId,
-      score: submissionsTable.score,
-      status: submissionsTable.status,
-      submittedAt: submissionsTable.submittedAt,
-    })
-    .from(submissionsTable)
-    .where(
-      and(
-        eq(submissionsTable.profileId, profileId),
-        eq(submissionsTable.athleteId, athleteId),
-        gte(submissionsTable.submittedAt, weekStart),
-        lte(submissionsTable.submittedAt, weekEnd),
-      ),
-    )
-    .orderBy(desc(submissionsTable.submittedAt));
-
-  // Build one activity row per challenge (latest submission for that challenge).
-  const latestByChallenge = new Map<
-    string,
-    { challengeId: string; submittedAt: Date; status: string; score: number | null }
-  >();
-
-  for (const s of submissions) {
-    const key = String(s.challengeId);
-    if (!latestByChallenge.has(key)) {
-      latestByChallenge.set(key, {
-        challengeId: key,
-        submittedAt: s.submittedAt as any,
-        status: String(s.status),
-        score: typeof s.score === "number" ? s.score : null,
-      });
-    }
-  }
-
-  // Only count challenges that have a non-error submission in this week (errors do NOT consume the attempt).
-  let challengesSubmitted = 0;
-  let aiBonus = 0;
-
-  for (const row of Array.from(latestByChallenge.values())) {
-    if (row.status !== "error") challengesSubmitted += 1;
-    if (row.status === "scored" && typeof row.score === "number") {
-      aiBonus += Math.floor(row.score / 10) * 5;
-    }
-  }
-
-  const basePoints = challengesSubmitted * 100;
-  const allChallengesBonus = challengesSubmitted >= 3 ? 50 : 0;
-  const totalPoints = basePoints + allChallengesBonus + aiBonus;
-
-  const activity = Array.from(latestByChallenge.values()).map((row) => {
-    const basePointsThis = row.status === "error" ? 0 : 100;
-    const aiPoints =
-      row.status === "scored" && typeof row.score === "number"
-        ? Math.floor(row.score / 10) * 5
-        : 0;
-
-    return {
-      ...row,
-      basePoints: basePointsThis,
-      aiPoints,
-      totalFromThisChallenge: basePointsThis + aiPoints,
-    };
-  });
+  const hub = await storage.getPointsHub(profileId, athleteId, weekStart, weekEnd);
 
   res.json({
     weekStart,
     weekEnd,
-    totalPoints,
-    breakdown: {
-      challengesSubmitted,
-      basePoints,
-      allChallengesBonus,
-      aiBonus,
-    },
-    activity,
+    ...hub,
   });
 });
 

@@ -14,8 +14,8 @@ import {
   seasons,
   meets,
   meetScores,
-  competitionPoints,
   drillSkills,
+  competitionPoints,
   type User,
   type InsertUser,
   type Athlete,
@@ -43,10 +43,10 @@ import {
   type Meet,
   type InsertMeet,
   type MeetScore,
-  type CompetitionPoint,
-  type InsertCompetitionPoint,
   type InsertMeetScore,
   type DrillSkillLink,
+  type CompetitionPoint,
+  type InsertCompetitionPoint,
   type SportType,
   type DifficultyLevel,
 } from "@shared/schema";
@@ -161,6 +161,28 @@ export interface IStorage {
     updates: Partial<ChallengeSubmission>,
   ): Promise<ChallengeSubmission | undefined>;
 
+  // ===== COMPETITION POINTS METHODS =====
+  awardCompetitionPoints(point: InsertCompetitionPoint): Promise<CompetitionPoint | undefined>;
+  getPointsForProfile(profileId: string, weekStart?: Date, weekEnd?: Date): Promise<CompetitionPoint[]>;
+  getPointsHub(profileId: string, athleteId: string, weekStart: Date, weekEnd: Date): Promise<{
+    totalPoints: number;
+    breakdown: {
+      challengesSubmitted: number;
+      basePoints: number;
+      allChallengesBonus: number;
+      aiBonus: number;
+    };
+    activity: Array<{
+      challengeId: string;
+      submittedAt: Date;
+      status: string;
+      score: number | null;
+      basePoints: number;
+      aiPoints: number;
+      totalFromThisChallenge: number;
+    }>;
+  }>;
+
   getWeeklyLeaderboard(profileId: string, weekStart: Date, weekEnd: Date): Promise<{
     athleteId: string;
     points: number;
@@ -209,35 +231,6 @@ export interface IStorage {
   updateMeetScore(id: string, updates: Partial<MeetScore>): Promise<MeetScore | undefined>;
   deleteMeetScore(id: string): Promise<boolean>;
   createMeetScores(scores: InsertMeetScore[]): Promise<MeetScore[]>;
-
-  // ===== COMPETITION POINTS METHODS =====
-  awardCompetitionPoints(
-    point: InsertCompetitionPoint,
-    options?: {
-      dailyCap?: number;
-      cooldownSeconds?: number;
-      minScore?: number;
-      enforceScoreThreshold?: boolean;
-      enforceDailyCap?: boolean;
-    },
-  ): Promise<{ awarded: boolean; reason: string; point?: CompetitionPoint }>;
-  getCompetitionPointsByProfile(
-    profileId: string,
-    weekStart?: Date,
-    weekEnd?: Date,
-  ): Promise<CompetitionPoint[]>;
-  getCompetitionPointsHub(
-    profileId: string,
-    weekStart?: Date,
-    weekEnd?: Date,
-  ): Promise<{
-    totalPoints: number;
-    challengesSubmitted: number;
-    basePoints: number;
-    aiBonus: number;
-    allChallengesBonus: number;
-    recentActivity: CompetitionPoint[];
-  }>;
 
   // ===== DEMO SEEDING =====
   seedDemoDataIfEmpty(): Promise<void>;
@@ -1050,70 +1043,238 @@ export class DatabaseStorage implements IStorage {
   }
 
 
+  // ===== COMPETITION POINTS METHODS =====
+  async awardCompetitionPoints(point: InsertCompetitionPoint): Promise<CompetitionPoint | undefined> {
+    const now = new Date();
+    const metadata = (point.metadata || {}) as any;
+    const score = typeof metadata.score === "number" ? metadata.score : null;
+
+    if (!point.profileId || !point.athleteId || !point.sourceId) return undefined;
+    if (!point.points || point.points <= 0) return undefined;
+
+    // Minimum quality threshold for normal analysis points.
+    // This prevents random junk videos from farming the leaderboard.
+    if (point.reason === "analysis_upload" && score !== null && score < 40) {
+      return undefined;
+    }
+
+    // Daily cap: normal upload/analyze points only count 3 times per day.
+    if (point.reason === "analysis_upload") {
+      const dayStart = new Date(now);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(now);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const todays = await db
+        .select({ id: competitionPoints.id })
+        .from(competitionPoints)
+        .where(
+          and(
+            eq(competitionPoints.profileId, point.profileId),
+            eq(competitionPoints.athleteId, point.athleteId),
+            eq(competitionPoints.reason, "analysis_upload"),
+            gte(competitionPoints.createdAt, dayStart),
+            lte(competitionPoints.createdAt, dayEnd),
+          ),
+        );
+
+      if (todays.length >= 3) return undefined;
+
+      const recent = await db
+        .select({ createdAt: competitionPoints.createdAt })
+        .from(competitionPoints)
+        .where(
+          and(
+            eq(competitionPoints.profileId, point.profileId),
+            eq(competitionPoints.athleteId, point.athleteId),
+            eq(competitionPoints.reason, "analysis_upload"),
+          ),
+        )
+        .orderBy(desc(competitionPoints.createdAt))
+        .limit(1);
+
+      const lastCreated = recent[0]?.createdAt;
+      if (lastCreated && now.getTime() - new Date(lastCreated).getTime() < 30_000) {
+        return undefined;
+      }
+    }
+
+    const [created] = await db
+      .insert(competitionPoints)
+      .values(point)
+      .onConflictDoNothing()
+      .returning();
+
+    return created || undefined;
+  }
+
+  async getPointsForProfile(
+    profileId: string,
+    weekStart?: Date,
+    weekEnd?: Date,
+  ): Promise<CompetitionPoint[]> {
+    const filters = [eq(competitionPoints.profileId, profileId)];
+
+    if (weekStart) filters.push(gte(competitionPoints.createdAt, weekStart));
+    if (weekEnd) filters.push(lte(competitionPoints.createdAt, weekEnd));
+
+    return db
+      .select()
+      .from(competitionPoints)
+      .where(and(...filters))
+      .orderBy(desc(competitionPoints.createdAt));
+  }
+
+  async getPointsHub(
+    profileId: string,
+    athleteId: string,
+    weekStart: Date,
+    weekEnd: Date,
+  ): Promise<{
+    totalPoints: number;
+    breakdown: {
+      challengesSubmitted: number;
+      basePoints: number;
+      allChallengesBonus: number;
+      aiBonus: number;
+    };
+    activity: Array<{
+      challengeId: string;
+      submittedAt: Date;
+      status: string;
+      score: number | null;
+      basePoints: number;
+      aiPoints: number;
+      totalFromThisChallenge: number;
+    }>;
+  }> {
+    const points = await db
+      .select()
+      .from(competitionPoints)
+      .where(
+        and(
+          eq(competitionPoints.profileId, profileId),
+          eq(competitionPoints.athleteId, athleteId),
+          gte(competitionPoints.createdAt, weekStart),
+          lte(competitionPoints.createdAt, weekEnd),
+        ),
+      )
+      .orderBy(desc(competitionPoints.createdAt));
+
+    const totalPoints = points.reduce((sum, p) => sum + (p.points || 0), 0);
+    const challengeIds = new Set<string>();
+
+    let basePoints = 0;
+    let aiBonus = 0;
+
+    for (const p of points) {
+      if (p.reason === "challenge_submission") {
+        challengeIds.add(p.sourceId);
+        basePoints += p.points || 0;
+      } else if (p.reason === "challenge_score_bonus") {
+        aiBonus += p.points || 0;
+      } else if (p.reason === "analysis_upload") {
+        basePoints += p.points || 0;
+      }
+    }
+
+    const allChallengesBonus = points
+      .filter((p) => p.reason === "all_challenges_bonus")
+      .reduce((sum, p) => sum + (p.points || 0), 0);
+
+    const byChallenge = new Map<
+      string,
+      {
+        challengeId: string;
+        submittedAt: Date;
+        status: string;
+        score: number | null;
+        basePoints: number;
+        aiPoints: number;
+        totalFromThisChallenge: number;
+      }
+    >();
+
+    for (const p of points) {
+      if (p.sourceType !== "challenge") continue;
+
+      const meta = (p.metadata || {}) as any;
+      const row = byChallenge.get(p.sourceId) ?? {
+        challengeId: p.sourceId,
+        submittedAt: p.createdAt || new Date(),
+        status: String(meta.status || "scored"),
+        score: typeof meta.score === "number" ? meta.score : null,
+        basePoints: 0,
+        aiPoints: 0,
+        totalFromThisChallenge: 0,
+      };
+
+      if (p.reason === "challenge_submission") row.basePoints += p.points || 0;
+      if (p.reason === "challenge_score_bonus") row.aiPoints += p.points || 0;
+      row.totalFromThisChallenge += p.points || 0;
+
+      byChallenge.set(p.sourceId, row);
+    }
+
+    return {
+      totalPoints,
+      breakdown: {
+        challengesSubmitted: challengeIds.size,
+        basePoints,
+        allChallengesBonus,
+        aiBonus,
+      },
+      activity: Array.from(byChallenge.values()),
+    };
+  }
+
   async getWeeklyLeaderboard(
     profileId: string,
     weekStart: Date,
     weekEnd: Date,
   ): Promise<{ athleteId: string; points: number; challengesCompleted: number; aiBonus: number }[]> {
-    // Pull submissions for this profile within the week window and aggregate in JS.
-    const submissions = await db
-      .select({
-        athleteId: challengeSubmissions.athleteId,
-        challengeId: challengeSubmissions.challengeId,
-        score: challengeSubmissions.score,
-        status: challengeSubmissions.status,
-        submittedAt: challengeSubmissions.submittedAt,
-      })
-      .from(challengeSubmissions)
+    const points = await db
+      .select()
+      .from(competitionPoints)
       .where(
         and(
-          eq(challengeSubmissions.profileId, profileId),
-          gte(challengeSubmissions.submittedAt, weekStart),
-          lte(challengeSubmissions.submittedAt, weekEnd),
+          eq(competitionPoints.profileId, profileId),
+          gte(competitionPoints.createdAt, weekStart),
+          lte(competitionPoints.createdAt, weekEnd),
         ),
-      )
-      .orderBy(desc(challengeSubmissions.submittedAt));
+      );
 
     const byAthlete = new Map<
       string,
-      { challenges: Set<string>; aiBonus: number }
+      { points: number; challenges: Set<string>; aiBonus: number }
     >();
 
-    for (const s of submissions) {
-      const entry = byAthlete.get(s.athleteId) ?? { challenges: new Set<string>(), aiBonus: 0 };
+    for (const p of points) {
+      const entry = byAthlete.get(p.athleteId) ?? {
+        points: 0,
+        challenges: new Set<string>(),
+        aiBonus: 0,
+      };
 
-      // Errors do NOT count as a completed/submitted challenge this week.
-      if (s.status !== "error") {
-        // Only count the latest attempt per challenge (submissions are ordered newest -> oldest)
-        if (!entry.challenges.has(s.challengeId)) {
-          entry.challenges.add(s.challengeId);
+      entry.points += p.points || 0;
 
-          if (s.status === "scored" && typeof s.score === "number") {
-            // Small nudge: floor(score/10) * 5
-            entry.aiBonus += Math.floor(s.score / 10) * 5;
-          }
-        }
+      if (p.sourceType === "challenge" && p.reason === "challenge_submission") {
+        entry.challenges.add(p.sourceId);
       }
 
-      byAthlete.set(s.athleteId, entry);
+      if (p.reason === "challenge_score_bonus") {
+        entry.aiBonus += p.points || 0;
+      }
+
+      byAthlete.set(p.athleteId, entry);
     }
 
-    const rows: { athleteId: string; points: number; challengesCompleted: number; aiBonus: number }[] = [];
-
-    for (const [athleteId, entry] of Array.from(byAthlete.entries())) {
-      const challengesCompleted = entry.challenges.size;
-
-      const base = challengesCompleted * 100;
-      const allBonus = challengesCompleted >= 3 ? 50 : 0; // tweak later if you want 350 total for 3/3
-      const aiBonus = entry.aiBonus;
-
-      rows.push({
-        athleteId,
-        challengesCompleted,
-        aiBonus,
-        points: base + allBonus + aiBonus,
-      });
-    }
+    const rows = Array.from(byAthlete.entries()).map(([athleteId, entry]) => ({
+      athleteId,
+      points: entry.points,
+      challengesCompleted: entry.challenges.size,
+      aiBonus: entry.aiBonus,
+    }));
 
     rows.sort((a, b) => b.points - a.points);
     return rows;
@@ -1565,168 +1726,6 @@ export class DatabaseStorage implements IStorage {
     // Insert many meet scores at once. Avoid calling values([]).
     if (!scores || scores.length === 0) return [];
     return db.insert(meetScores).values(scores as any).returning();
-  }
-
-  async awardCompetitionPoints(
-    point: InsertCompetitionPoint,
-    options: {
-      dailyCap?: number;
-      cooldownSeconds?: number;
-      minScore?: number;
-      enforceScoreThreshold?: boolean;
-      enforceDailyCap?: boolean;
-    } = {},
-  ): Promise<{ awarded: boolean; reason: string; point?: CompetitionPoint }> {
-    const sourceType = String(point.sourceType || "");
-    const reason = String(point.reason || "");
-    const metadata = (point.metadata || {}) as Record<string, unknown>;
-    const score = typeof metadata.score === "number" ? metadata.score : undefined;
-
-    const isNormalAnalysis = sourceType === "analysis" || sourceType === "normal_analysis";
-    const isChallenge = sourceType === "challenge" || sourceType === "challenge_submission";
-
-    const dailyCap = options.dailyCap ?? (isNormalAnalysis ? 3 : 9999);
-    const cooldownSeconds = options.cooldownSeconds ?? (isNormalAnalysis ? 30 : 0);
-    const minScore = options.minScore ?? (isNormalAnalysis ? 40 : 0);
-    const enforceScoreThreshold = options.enforceScoreThreshold ?? isNormalAnalysis;
-    const enforceDailyCap = options.enforceDailyCap ?? isNormalAnalysis;
-
-    if (!point.athleteId || !point.profileId || !point.sourceType || !point.sourceId || !point.reason) {
-      return { awarded: false, reason: "missing_required_point_fields" };
-    }
-
-    if (!Number.isFinite(point.points) || point.points <= 0) {
-      return { awarded: false, reason: "invalid_points" };
-    }
-
-    if (enforceScoreThreshold && typeof score === "number" && score < minScore) {
-      return { awarded: false, reason: "score_below_point_threshold" };
-    }
-
-    const now = new Date();
-
-    if (cooldownSeconds > 0) {
-      const cooldownStart = new Date(now.getTime() - cooldownSeconds * 1000);
-      const [recent] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(competitionPoints)
-        .where(
-          and(
-            eq(competitionPoints.profileId, point.profileId),
-            eq(competitionPoints.sourceType, sourceType),
-            eq(competitionPoints.reason, reason),
-            gte(competitionPoints.createdAt, cooldownStart),
-          ),
-        );
-
-      if ((recent?.count ?? 0) > 0) {
-        return { awarded: false, reason: "cooldown_active" };
-      }
-    }
-
-    if (enforceDailyCap && dailyCap > 0) {
-      const dayStart = new Date(now);
-      dayStart.setHours(0, 0, 0, 0);
-
-      const [today] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(competitionPoints)
-        .where(
-          and(
-            eq(competitionPoints.profileId, point.profileId),
-            eq(competitionPoints.sourceType, sourceType),
-            eq(competitionPoints.reason, reason),
-            gte(competitionPoints.createdAt, dayStart),
-          ),
-        );
-
-      if ((today?.count ?? 0) >= dailyCap) {
-        return { awarded: false, reason: "daily_point_cap_reached" };
-      }
-    }
-
-    if (isChallenge) {
-      const status = typeof metadata.status === "string" ? metadata.status : undefined;
-      if (status === "error" || status === "ineligible") {
-        return { awarded: false, reason: "challenge_not_eligible_for_points" };
-      }
-    }
-
-    try {
-      const [created] = await db
-        .insert(competitionPoints)
-        .values(point)
-        .onConflictDoNothing()
-        .returning();
-
-      if (!created) {
-        return { awarded: false, reason: "duplicate_point_blocked" };
-      }
-
-      return { awarded: true, reason: "awarded", point: created };
-    } catch (error) {
-      console.warn("awardCompetitionPoints failed:", error);
-      return { awarded: false, reason: "point_insert_failed" };
-    }
-  }
-
-  async getCompetitionPointsByProfile(
-    profileId: string,
-    weekStart?: Date,
-    weekEnd?: Date,
-  ): Promise<CompetitionPoint[]> {
-    const filters = [eq(competitionPoints.profileId, profileId)];
-
-    if (weekStart) filters.push(gte(competitionPoints.createdAt, weekStart));
-    if (weekEnd) filters.push(lte(competitionPoints.createdAt, weekEnd));
-
-    return db
-      .select()
-      .from(competitionPoints)
-      .where(and(...filters))
-      .orderBy(desc(competitionPoints.createdAt));
-  }
-
-  async getCompetitionPointsHub(
-    profileId: string,
-    weekStart?: Date,
-    weekEnd?: Date,
-  ): Promise<{
-    totalPoints: number;
-    challengesSubmitted: number;
-    basePoints: number;
-    aiBonus: number;
-    allChallengesBonus: number;
-    recentActivity: CompetitionPoint[];
-  }> {
-    const points = await this.getCompetitionPointsByProfile(profileId, weekStart, weekEnd);
-
-    const totalPoints = points.reduce((sum, p) => sum + (p.points || 0), 0);
-    const challengeRows = points.filter((p) =>
-      p.sourceType === "challenge" || p.sourceType === "challenge_submission",
-    );
-    const challengeSources = new Set(challengeRows.map((p) => p.sourceId));
-
-    const basePoints = points
-      .filter((p) => p.reason.includes("base") || p.reason.includes("submission") || p.reason.includes("analysis_complete"))
-      .reduce((sum, p) => sum + (p.points || 0), 0);
-
-    const aiBonus = points
-      .filter((p) => p.reason.includes("ai") || p.reason.includes("score") || p.reason.includes("bonus"))
-      .reduce((sum, p) => sum + (p.points || 0), 0);
-
-    const allChallengesBonus = points
-      .filter((p) => p.reason.includes("all_challenges"))
-      .reduce((sum, p) => sum + (p.points || 0), 0);
-
-    return {
-      totalPoints,
-      challengesSubmitted: challengeSources.size,
-      basePoints,
-      aiBonus,
-      allChallengesBonus,
-      recentActivity: points.slice(0, 10),
-    };
   }
 
   async seedDemoDataIfEmpty(): Promise<void> {
