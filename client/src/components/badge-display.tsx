@@ -26,6 +26,21 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles,
 };
 
+function getBadgeInfoSafe(badgeType: BadgeType | string | undefined) {
+  const key = badgeType as BadgeType;
+  const fallback = {
+    name: String(badgeType || "Badge").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    description: "Badge earned in GymGlow.",
+    icon: "Award",
+    rarity: "common" as keyof typeof badgeTierDisplayNames,
+  };
+
+  if (!badgeType) return fallback;
+
+  return (badgeInfo as Record<string, any>)[key] || fallback;
+}
+
+
 interface BadgeIconProps {
   badgeType: BadgeType;
   size?: "sm" | "md" | "lg";
@@ -33,9 +48,9 @@ interface BadgeIconProps {
 }
 
 export function BadgeIcon({ badgeType, size = "md", showTooltip = true }: BadgeIconProps) {
-  const info = badgeInfo[badgeType];
+  const info = getBadgeInfoSafe(badgeType);
   const Icon = iconMap[info.icon] || Award;
-  const tierBorder = badgeTierColors[info.rarity];
+  const tierBorder = (badgeTierColors as Record<string, string>)[info.rarity] || badgeTierColors.common || "border-gray-300";
   
   const sizeClasses = {
     sm: "h-6 w-6 p-1",
@@ -71,7 +86,7 @@ export function BadgeIcon({ badgeType, size = "md", showTooltip = true }: BadgeI
       <TooltipContent>
         <div className="text-center">
           <p className="font-semibold">{info.name}</p>
-          <p className="text-xs text-muted-foreground">{badgeTierDisplayNames[info.rarity]}</p>
+          <p className="text-xs text-muted-foreground">{(badgeTierDisplayNames as Record<string, string>)[info.rarity] || "Common"}</p>
           <p className="text-xs text-muted-foreground max-w-[200px]">{info.description}</p>
         </div>
       </TooltipContent>
@@ -122,7 +137,7 @@ export function NewBadgesDisplay({ badges }: NewBadgesDisplayProps) {
       <CardContent>
         <div className="flex flex-wrap gap-3">
           {badges.map((badge) => {
-            const info = badgeInfo[badge.badgeType];
+            const info = getBadgeInfoSafe(badge.badgeType);
             return (
               <div key={badge.id} className="flex flex-col items-center gap-1" data-testid={`earned-badge-${badge.badgeType}`}>
                 <BadgeIcon badgeType={badge.badgeType} size="md" showTooltip={false} />
@@ -219,7 +234,7 @@ export function BadgeShowcase({ athleteId, athleteName }: BadgeShowcaseProps) {
   }, [] as (EarnedBadge & { count?: number })[]);
 
   const badgeText = uniqueBadges.map(b => {
-    const info = badgeInfo[b.badgeType];
+    const info = getBadgeInfoSafe(b.badgeType);
     return `${info.name}${b.count && b.count > 1 ? ` x${b.count}` : ''}`;
   }).join(', ');
 
@@ -287,7 +302,7 @@ export function BadgeShowcase({ athleteId, athleteName }: BadgeShowcaseProps) {
                 data-testid="badge-showcase-grid"
               >
                 {uniqueBadges.map((badge) => {
-                  const info = badgeInfo[badge.badgeType];
+                  const info = getBadgeInfoSafe(badge.badgeType);
                   return (
                     <div 
                       key={badge.badgeType} 
