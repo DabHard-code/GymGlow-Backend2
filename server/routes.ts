@@ -362,21 +362,9 @@ app.post("/api/uploads/video/backend", backendVideoUpload.single("video"), async
     });
   });
 
-  // MVP plan setter (for development). In production, you should set this from your Stripe webhook.
-  app.post("/api/users/me/plan", async (req, res) => {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
-
-    const parsed = z
-      .object({ plan: z.enum(["coach", "competition"]) })
-      .safeParse(req.body);
-
-    if (!parsed.success) return res.status(400).json(parsed.error);
-
-    await storage.ensureUserFromAuth(userId);
-    const updated = await storage.updateUserPlan(userId, parsed.data.plan);
-
-    res.json({ id: updated.id, username: updated.username, plan: updated.plan });
+  // Disabled: plans must be changed by Stripe/webhook, not by client request.
+  app.post("/api/users/me/plan", (_req, res) => {
+    return res.status(403).json({ error: "Plan changes must go through billing." });
   });
 
   // ----------------------------
@@ -1030,9 +1018,8 @@ app.get("/billing/portal", async (req, res) => {
           })),
         );
       }
-
-      await supabaseAdmin.storage.from("Videos").remove([videoPath]);
-      await storage.updateSession(sessionId, { status: "ready" });
+      // Keep optimized video in Supabase for playback, history, and recent results.
+await storage.updateSession(sessionId, { status: "ready" });
     } catch (err) {
       console.error("ANALYSIS ERROR:", err);
 
