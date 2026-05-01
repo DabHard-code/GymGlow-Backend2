@@ -237,6 +237,51 @@ export async function registerRoutes(
     res.json({ version: "v8411-copy-patched-auth-2026-04-02" });
   });
 
+  async function requireProfileAccess(req: Request, res: Response, profileId: string) {
+    const userId = requireUserId(req, res);
+    if (!userId) return null;
+
+    const profile = await storage.getProfile(profileId);
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return null;
+    }
+
+    const athlete = await storage.getAthlete(profile.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      res.status(404).json({ error: "Profile not found" });
+      return null;
+    }
+
+    return { userId, profile, athlete };
+  }
+
+  async function requireSessionAccess(req: Request, res: Response, sessionId: string) {
+    const session = await storage.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: "Not found" });
+      return null;
+    }
+
+    const access = await requireProfileAccess(req, res, session.profileId);
+    if (!access) return null;
+
+    return { ...access, session };
+  }
+
+  async function requireAnalysisAccess(req: Request, res: Response, analysisId: string) {
+    const analysis = await storage.getAnalysis(analysisId);
+    if (!analysis) {
+      res.status(404).json({ error: "Not found" });
+      return null;
+    }
+
+    const access = await requireSessionAccess(req, res, analysis.sessionId);
+    if (!access) return null;
+
+    return { ...access, analysis };
+  }
+
   app.post("/api/uploads/video/prepare", async (req, res) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
@@ -710,11 +755,12 @@ app.get("/billing/portal", async (req, res) => {
     res.json(await storage.getProfilesByAthlete(req.params.athleteId));
   });
 
-  // ✅ MISSING ROUTE (this is what your frontend is calling and getting 404)
+  // Returns one profile only if it belongs to the logged-in user.
   app.get("/api/profiles/:profileId", async (req, res) => {
-    const profile = await storage.getProfile(req.params.profileId);
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
-    res.json(profile);
+    const access = await requireProfileAccess(req, res, req.params.profileId);
+    if (!access) return;
+
+    res.json(access.profile);
   });
 
   app.post("/api/profiles", async (req, res) => {
@@ -1045,20 +1091,28 @@ await storage.updateSession(sessionId, { status: "ready" });
   /* ==================== SESSIONS ==================== */
 
   app.get("/api/sessions/:id", async (req, res) => {
-    const session = await storage.getSession(req.params.id);
-    if (!session) return res.status(404).json({ error: "Not found" });
-    res.json(session);
+    const access = await requireSessionAccess(req, res, req.params.id);
+    if (!access) return;
+
+    res.json(access.session);
   });
 
   app.get("/api/sessions/:id/analysis", async (req, res) => {
+    const access = await requireSessionAccess(req, res, req.params.id);
+    if (!access) return;
+
     const list = await storage.getAnalysesBySession(req.params.id);
     if (!list.length) return res.status(404).json({ error: "Not ready" });
+
     res.json(list[0]);
   });
 
   /* ==================== ANALYSES ==================== */
 
   app.get("/api/profiles/:profileId/analyses", async (req, res) => {
+    const access = await requireProfileAccess(req, res, req.params.profileId);
+    if (!access) return;
+
     res.json(
       await storage.getRecentAnalysesByProfile(
         req.params.profileId,
@@ -1068,9 +1122,10 @@ await storage.updateSession(sessionId, { status: "ready" });
   });
 
   app.get("/api/analyses/:id", async (req, res) => {
-    const analysis = await storage.getAnalysis(req.params.id);
-    if (!analysis) return res.status(404).json({ error: "Not found" });
-    res.json(analysis);
+    const access = await requireAnalysisAccess(req, res, req.params.id);
+    if (!access) return;
+
+    res.json(access.analysis);
   });
 
   /* ==================== BADGES ==================== */
