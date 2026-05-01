@@ -22,13 +22,18 @@ export async function apiRequest(
 ): Promise<Response> {
   const authHeaders = await getAuthHeaders();
 
+  const headers: Record<string, string> = {
+    ...authHeaders,
+  };
+
+  if (data !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(url, {
     method,
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-      ...authHeaders,
-    },
-    body: data ? JSON.stringify(data) : undefined,
+    headers,
+    body: data !== undefined ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
@@ -38,10 +43,9 @@ export async function apiRequest(
 
 type UnauthorizedBehavior = "returnNull" | "throw";
 
-export function getQueryFn<T = unknown>(options: {
-  on401: UnauthorizedBehavior;
-}): QueryFunction<T> {
-  return async ({ queryKey }) => {
+export const getQueryFn =
+  <T = unknown>(options: { on401: UnauthorizedBehavior }): QueryFunction<T> =>
+  async ({ queryKey }) => {
     const authHeaders = await getAuthHeaders();
 
     const res = await fetch(queryKey[0] as string, {
@@ -58,7 +62,6 @@ export function getQueryFn<T = unknown>(options: {
     await throwIfResNotOk(res);
     return (await res.json()) as T;
   };
-}
 
 export const queryClient = new QueryClient({
   defaultOptions: {
