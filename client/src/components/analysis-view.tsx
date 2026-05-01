@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { VideoPlayer } from "./video-player";
 import { FeedbackPanel } from "./feedback-panel";
 import { ExerciseTypeSelector } from "./exercise-type-selector";
+import { compressVideo, type VideoCompressionProgress } from "./video-compress";
 import type { AnalysisResult, SportType, Session } from "@shared/schema";
 import { sportDisplayNames } from "@shared/schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -37,9 +38,16 @@ type UserMe = {
   trialCredits?: number;
 };
 
-type AnalysisStep = "uploading" | "processing" | "analyzing" | "ready" | "error";
+type AnalysisStep =
+  | "compressing"
+  | "uploading"
+  | "processing"
+  | "analyzing"
+  | "ready"
+  | "error";
 
 const analysisSteps: { key: AnalysisStep; label: string; icon: typeof Activity }[] = [
+  { key: "compressing", label: "Prepping video...", icon: Activity },
   { key: "uploading", label: "Uploading video...", icon: Activity },
   { key: "processing", label: "Optimizing video...", icon: Eye },
   { key: "analyzing", label: "Analyzing form...", icon: Target },
@@ -59,12 +67,18 @@ const GYM_TIPS = [
   "Arms matter: strong arm positions clean up the whole look of a routine.",
 ];
 
+function formatMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function AnalyzingOverlay({
   currentStep,
   error,
+  compressionProgress,
 }: {
   currentStep: AnalysisStep;
   error?: string;
+  compressionProgress?: VideoCompressionProgress | null;
 }) {
   const stepIndex = analysisSteps.findIndex((s) => s.key === currentStep);
   const [tipIndex, setTipIndex] = useState(
@@ -79,12 +93,22 @@ function AnalyzingOverlay({
     return () => window.clearInterval(interval);
   }, [currentStep]);
 
-  const progress =
+  const stepProgress =
     currentStep === "ready"
       ? 100
       : currentStep === "error"
         ? 0
         : Math.min(((stepIndex + 1) / analysisSteps.length) * 100, 95);
+
+  const progress =
+    currentStep === "compressing" && compressionProgress
+      ? Math.min(compressionProgress.progress, 98)
+      : stepProgress;
+
+  const headline =
+    currentStep === "compressing"
+      ? compressionProgress?.message || "Preparing video..."
+      : "Analyzing Your Form";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm px-4">
@@ -101,9 +125,9 @@ function AnalyzingOverlay({
           <div className="space-y-5">
             <div className="text-center">
               <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
-              <h3 className="mt-4 text-xl font-bold">Analyzing Your Form</h3>
+              <h3 className="mt-4 text-xl font-bold">{headline}</h3>
               <p className="text-sm text-muted-foreground">
-                Large videos can take a few minutes while GymGlow optimizes them.
+                Large videos may be compressed before upload so GymGlow feels faster.
               </p>
             </div>
 
@@ -123,10 +147,7 @@ function AnalyzingOverlay({
                 const isComplete = stepIndex > index || currentStep === "ready";
 
                 return (
-                  <div
-                    key={step.key}
-                    className="flex items-center gap-3 text-sm"
-                  >
+                  <div key={step.key} className="flex items-center gap-3 text-sm">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full border">
                       {isComplete ? (
                         <CheckCircle className="h-4 w-4 text-green-600" />
@@ -185,13 +206,13 @@ export function AnalysisView({
   const [currentStep, setCurrentStep] = useState<AnalysisStep | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
-
-  // Starts as the local browser preview, then switches to the optimized MP4
-  // that the backend uploads to Supabase.
   const [playbackUrl, setPlaybackUrl] = useState(videoUrl);
   const [optimizedVideoPath, setOptimizedVideoPath] = useState<string | null>(
     null,
   );
+  const [compressionProgress, setCompressionProgress] =
+    useState<VideoCompressionProgress | null>(null);
+  const [uploadFileSize, setUploadFileSize] = useState<number>(videoFile.size);
 
   const { toast } = useToast();
 
@@ -202,12 +223,12 @@ export function AnalysisView({
     setSessionId(null);
     setCurrentStep(null);
     setErrorMessage(undefined);
+    setCompressionProgress(null);
+    setUploadFileSize(videoFile.size);
   }, [videoFile, videoUrl]);
 
-  const fileSizeMb = useMemo(
-    () => (videoFile.size / (1024 * 1024)).toFixed(1),
-    [videoFile.size],
-  );
+  const fileSizeMb = useMemo(() => formatMb(videoFile.size), [videoFile.size]);
+  const uploadSizeMb = useMemo(() => formatMb(uploadFileSize), [uploadFileSize]);
 
   const isLikelyBadBrowserPreview = useMemo(() => {
     const name = videoFile.name.toLowerCase();
@@ -318,9 +339,11 @@ export function AnalysisView({
   });
 
   const handleAnalyze = async () => {
-    setCurrentStep("uploading");
+    setCurrentStep("compressing");
     setErrorMessage(undefined);
     setAnalysisResult(null);
+    setCompressionProgress(null);
+    setUploadFileSize(videoFile.size);
 
     try {
       const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -329,8 +352,19 @@ export function AnalysisView({
         throw new Error("You must be logged in to upload and analyze videos.");
       }
 
+      const fileForUpload = await compressVideo(videoFile, {
+        onProgress: setCompressionProgress,
+        minSizeBytes: 45 * 1024 * 1024,
+        maxWidth: 1280,
+        maxHeight: 720,
+        fps: 24,
+      });
+
+      setUploadFileSize(fileForUpload.size);
+      setCurrentStep("uploading");
+
       const formData = new FormData();
-      formData.append("video", videoFile);
+      formData.append("video", fileForUpload);
       formData.append("profileId", profileId || "no-profile");
 
       const uploadResponse = await fetch("/api/uploads/video/backend", {
@@ -355,9 +389,6 @@ export function AnalysisView({
 
       setOptimizedVideoPath(uploadData.videoPath);
 
-      // IMPORTANT FIX:
-      // Switch the visible player away from the original MOV/HEVC preview
-      // and onto the browser-safe optimized MP4 from Supabase.
       const signedUrl = await getSignedPlaybackUrl(uploadData.videoPath);
       if (signedUrl) {
         setPlaybackUrl(signedUrl);
@@ -390,7 +421,11 @@ export function AnalysisView({
   return (
     <div className="min-h-screen bg-background">
       {currentStep && (
-        <AnalyzingOverlay currentStep={currentStep} error={errorMessage} />
+        <AnalyzingOverlay
+          currentStep={currentStep}
+          error={errorMessage}
+          compressionProgress={compressionProgress}
+        />
       )}
 
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
@@ -444,22 +479,24 @@ export function AnalysisView({
 
           <div className="text-center">
             <p className="font-medium">
-              {videoFile.name}{" "}
-              <span className="text-muted-foreground">({fileSizeMb} MB)</span>
+              {videoFile.name} <span className="text-muted-foreground">({fileSizeMb})</span>
             </p>
 
-            {optimizedVideoPath ? (
+            {uploadFileSize !== videoFile.size ? (
+              <p className="mt-2 text-sm text-green-700">
+                Upload optimized from {fileSizeMb} to {uploadSizeMb} before backend processing.
+              </p>
+            ) : optimizedVideoPath ? (
               <p className="mt-2 text-sm text-green-700">
                 Optimized MP4 loaded for playback and analysis.
               </p>
             ) : isLikelyBadBrowserPreview ? (
               <p className="mt-2 text-sm text-muted-foreground">
-                This phone video format may preview black in Chrome. After you
-                analyze it, GymGlow switches the player to the optimized MP4.
+                This phone video format may preview black in Chrome. GymGlow will still optimize it after upload.
               </p>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Large videos are sent to GymGlow first, optimized, then stored safely.
+                Large videos are compressed when possible, then sent to GymGlow for final optimization.
               </p>
             )}
           </div>
