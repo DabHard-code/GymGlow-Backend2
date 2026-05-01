@@ -54,7 +54,7 @@ export function VideoUploadZone({ onVideoSelect, disabled, compact }: VideoUploa
       // IMPORTANT:
       // Do not browser-compress or re-encode here.
       // Browser MediaRecorder can create fake/corrupted mp4/webm files.
-      // Send the original file to Supabase and let the backend ffmpeg pipeline convert it.
+      // Send the original file to GymGlow backend first; backend ffmpeg shrinks it before Supabase storage.
       onVideoSelect(file);
     },
     [onVideoSelect, validateFile],
@@ -95,7 +95,7 @@ export function VideoUploadZone({ onVideoSelect, disabled, compact }: VideoUploa
     [selectFile],
   );
 
-  const helperText = "MP4, MOV, WebM, M4V, HEVC, or QT up to 500 MB. Large videos are optimized after upload.";
+  const helperText = "MP4, MOV, WebM, M4V, HEVC, or QT up to 500 MB. Large videos are sent to GymGlow first, optimized, then stored safely.";
 
   const content = compact ? (
     <>
@@ -132,7 +132,7 @@ export function VideoUploadZone({ onVideoSelect, disabled, compact }: VideoUploa
         {isDragging ? "Drop your video here" : "Upload Your Video"}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Upload your routine, drill, swing, or dance video. GymGlow will optimize large mobile videos before AI analysis.
+        Upload your routine, drill, swing, or dance video. GymGlow will optimize large mobile videos before storage and AI analysis.
       </p>
       <Button type="button" className="mt-4" disabled={disabled}>
         Browse Files

@@ -315,29 +315,26 @@ setTimeout(() => {
         throw new Error("You must be logged in to upload and analyze videos.");
       }
 
-      const userId = authData.user.id;
+      const formData = new FormData();
+      formData.append("video", videoFile);
+      formData.append("profileId", profileId || "no-profile");
 
-      // ✅ Upload to Supabase Storage bucket: Videos
-      const objectPath = buildVideoObjectPath({
-        userId,
-        profileId,
-        filename: videoFile.name,
+      const uploadResponse = await fetch("/api/uploads/video/backend", {
+        method: "POST",
+        headers: {
+          "x-user-id": authData.user.id,
+        },
+        body: formData,
       });
 
-      const { error: uploadErr } = await supabase.storage
-        .from("Videos")
-        .upload(objectPath, videoFile, {
-          contentType: videoFile.type || "video/mp4",
-          upsert: false,
-        });
+      const uploadData = await uploadResponse.json().catch(() => null);
 
-      if (uploadErr) {
-        throw new Error(`Upload failed: ${uploadErr.message}`);
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData?.error || `Upload failed with status ${uploadResponse.status}`);
       }
 
-      // ✅ Tell backend to analyze by storage path (NO BASE64)
       analyzeMutation.mutate({
-        videoPath: objectPath,
+        videoPath: uploadData.videoPath,
         title: videoFile.name,
       });
     } catch (error: any) {

@@ -22,40 +22,6 @@ import { getStripe, getPriceIdForPlan, planFromPriceId, type PaidPlan } from "./
 
 /* ==================== VIDEO FILE DOWNLOAD HELPERS ==================== */
 
-
-function sanitizeUploadFileName(fileName: string | null | undefined): string {
-  const raw = String(fileName || "upload.mp4");
-  const cleaned = raw
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/_+/g, "_")
-    .slice(0, 120);
-  return cleaned || "upload.mp4";
-}
-
-function inferVideoExtension(fileName: string | null | undefined, mimeType: string | null | undefined): string {
-  const fromName = String(fileName || "").toLowerCase().match(/.(mp4|mov|m4v|webm|avi|mkv)$/)?.[1];
-  if (fromName) return fromName === "m4v" ? "mp4" : fromName;
-
-  const mime = String(mimeType || "").toLowerCase();
-  if (mime.includes("quicktime")) return "mov";
-  if (mime.includes("webm")) return "webm";
-  if (mime.includes("x-msvideo") || mime.includes("avi")) return "avi";
-  if (mime.includes("matroska") || mime.includes("mkv")) return "mkv";
-  return "mp4";
-}
-
-function hasInlineVideoPayload(body: unknown): boolean {
-  if (!body || typeof body !== "object") return false;
-  const value = body as Record<string, unknown>;
-  return (
-    typeof value.videoBase64 === "string" ||
-    typeof value.videoData === "string" ||
-    typeof value.videoBuffer === "string" ||
-    typeof value.fileBase64 === "string" ||
-    typeof value.dataUrl === "string"
-  );
-}
-
 function safeVideoExtension(videoPath: string | null | undefined): string {
   const clean = String(videoPath || "").split("?")[0].toLowerCase();
   const ext = path.extname(clean);

@@ -14,17 +14,17 @@ export async function transcodeTo1080pH264Mp4(inputPath: string): Promise<string
     "-i", inputPath,
 
     // Downscale to <=1080p, preserve aspect ratio
-    "-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
 
     // H.264 encode (fast)
     "-c:v", "libx264",
     "-preset", "veryfast",
-    "-crf", "23",
+    "-crf", "28", "-maxrate", "2500k", "-bufsize", "5000k",
     "-pix_fmt", "yuv420p",
 
     // Audio safe default
     "-c:a", "aac",
-    "-b:a", "128k",
+    "-b:a", "96k",
 
     // Better seeking/streaming
     "-movflags", "+faststart",
