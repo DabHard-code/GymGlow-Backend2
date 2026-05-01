@@ -1,47 +1,50 @@
-import { spawn } from "child_process";
+import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 import path from "path";
+import fs from "fs";
 
-export async function transcodeTo1080pH264Mp4(inputPath: string): Promise<string> {
-  if (!ffmpegPath) throw new Error("ffmpeg-static not available");
+ffmpeg.setFfmpegPath(ffmpegPath as string);
 
-  const dir = path.dirname(inputPath);
-  const base = path.basename(inputPath).replace(/\.[^.]+$/, "");
-  const outPath = path.join(dir, `${base}_1080p_h264.mp4`);
+export async function transcodeTo1080pH264Mp4(
+  inputPath: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const outputPath =
+      path.join(
+        path.dirname(inputPath),
+        path.basename(inputPath, path.extname(inputPath)),
+      ) + "_optimized.mp4";
 
-  const args = [
-    "-y",
-    "-i", inputPath,
+    ffmpeg(inputPath)
+      .outputOptions([
+        "-c:v libx264",
+        "-preset veryfast",
+        "-crf 28",
+        "-pix_fmt yuv420p",
+        "-profile:v baseline",
+        "-level 3.1",
+        "-movflags +faststart",
+        "-c:a aac",
+        "-b:a 128k",
+        "-ar 44100",
+        "-vf scale='min(1280,iw)':-2",
+      ])
+      .on("start", (cmd) => {
+        console.log("FFMPEG START:", cmd);
+      })
+      .on("error", (err) => {
+        console.error("FFMPEG ERROR:", err.message);
+        reject(err);
+      })
+      .on("end", () => {
+        console.log("FFMPEG DONE:", outputPath);
 
-    // Downscale to <=1080p, preserve aspect ratio
-    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
+        if (!fs.existsSync(outputPath)) {
+          return reject(new Error("Output file missing after transcode"));
+        }
 
-    // H.264 encode (fast)
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-crf", "28", "-maxrate", "2500k", "-bufsize", "5000k",
-    "-pix_fmt", "yuv420p",
-
-    // Audio safe default
-    "-c:a", "aac",
-    "-b:a", "96k",
-
-    // Better seeking/streaming
-    "-movflags", "+faststart",
-
-    outPath,
-  ];
-
-  await new Promise<void>((resolve, reject) => {
-    const p = spawn(ffmpegPath as string, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stderr = "";
-    p.stderr.on("data", (d) => (stderr += d.toString()));
-    p.on("error", reject);
-    p.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg failed (code ${code}): ${stderr.slice(-2000)}`));
-    });
+        resolve(outputPath);
+      })
+      .save(outputPath);
   });
-
-  return outPath;
 }
