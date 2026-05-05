@@ -1,29 +1,43 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, QueryKey } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function buildUrlFromQueryKey(queryKey: QueryKey): string {
+  const parts = queryKey
+    .filter((part) => part !== undefined && part !== null && part !== "")
+    .map((part) => String(part));
+
+  if (parts.length === 0) return "/";
+
+  // If the first key already contains query params, keep it exactly.
+  if (parts.length === 1 || parts[0].includes("?")) {
+    return parts[0];
+  }
+
+  return parts
+    .map((part, index) => {
+      if (index === 0) return part.replace(/\/+$/g, "");
+      return part.replace(/^\/+|\/+$/g, "");
+    })
+    .join("/");
+}
+
 async function getCurrentUserId(): Promise<string | null> {
-  // getSession is usually faster/more reliable right after page load.
   const sessionResult = await supabase.auth.getSession();
   const sessionUserId = sessionResult.data.session?.user?.id;
   if (sessionUserId) return sessionUserId;
 
   const userResult = await supabase.auth.getUser();
-  const userId = userResult.data.user?.id;
-  if (userId) return userId;
-
-  return null;
+  return userResult.data.user?.id ?? null;
 }
 
-async function getAuthHeaders(options?: { waitForAuth?: boolean }): Promise<Record<string, string>> {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   let userId = await getCurrentUserId();
 
-  // On refresh, Supabase may need a moment to hydrate the session.
-  // Protected app queries should wait briefly instead of immediately firing without x-user-id.
-  if (!userId && options?.waitForAuth) {
+  if (!userId) {
     for (let i = 0; i < 10; i += 1) {
       await wait(150);
       userId = await getCurrentUserId();
@@ -46,7 +60,7 @@ export async function apiRequest(
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const authHeaders = await getAuthHeaders({ waitForAuth: true });
+  const authHeaders = await getAuthHeaders();
 
   const headers: Record<string, string> = {
     ...authHeaders,
@@ -70,8 +84,8 @@ export async function apiRequest(
 export const getQueryFn =
   <T = unknown>(): QueryFunction<T> =>
   async ({ queryKey }) => {
-    const url = String(queryKey[0]);
-    const authHeaders = await getAuthHeaders({ waitForAuth: true });
+    const url = buildUrlFromQueryKey(queryKey);
+    const authHeaders = await getAuthHeaders();
 
     const res = await fetch(url, {
       headers: {
