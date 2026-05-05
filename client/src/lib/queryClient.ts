@@ -32,6 +32,15 @@ async function getCurrentSessionAuth(): Promise<{ token: string; userId: string 
     return { token: session.access_token, userId: session.user.id };
   }
 
+  const refreshResult = await supabase.auth.refreshSession();
+  const refreshedSession = refreshResult.data.session;
+  if (refreshedSession?.access_token && refreshedSession.user?.id) {
+    return {
+      token: refreshedSession.access_token,
+      userId: refreshedSession.user.id,
+    };
+  }
+
   return null;
 }
 
@@ -53,6 +62,14 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
     : {};
 }
 
+async function getRequiredAuthHeaders(): Promise<Record<string, string>> {
+  const authHeaders = await getAuthHeaders();
+  if (!authHeaders.Authorization) {
+    throw new Error("You are not logged in. Please log out and log back in.");
+  }
+  return authHeaders;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -65,7 +82,7 @@ export async function apiRequest(
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const authHeaders = await getAuthHeaders();
+  const authHeaders = await getRequiredAuthHeaders();
 
   const headers: Record<string, string> = {
     ...authHeaders,
@@ -90,7 +107,7 @@ export const getQueryFn =
   <T = unknown>(): QueryFunction<T> =>
   async ({ queryKey }) => {
     const url = buildUrlFromQueryKey(queryKey);
-    const authHeaders = await getAuthHeaders();
+    const authHeaders = await getRequiredAuthHeaders();
 
     const res = await fetch(url, {
       headers: {
