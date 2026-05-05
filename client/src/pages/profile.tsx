@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useParams, Link } from "wouter";
 import {
   ArrowLeft,
@@ -100,18 +101,15 @@ function AnalysisCard({
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
+  const res = await apiRequest("GET", url);
 
-  // If auth redirects or HTML happens, this catches it
   const contentType = res.headers.get("content-type") || "";
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status} for ${url}: ${text.slice(0, 300)}`);
-  }
+
   if (!contentType.includes("application/json")) {
     const text = await res.text();
     throw new Error(`Non-JSON response for ${url}: ${text.slice(0, 300)}`);
   }
+
   return res.json();
 }
 
