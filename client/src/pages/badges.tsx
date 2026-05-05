@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { BadgeIconDb } from "@/components/badge-icon-db";
 import { BadgeRow } from "@/components/badge-display";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
 
 import type { Athlete, SportProfile, EarnedBadge } from "@shared/schema";
 
@@ -135,7 +136,7 @@ export default function BadgesPage({ params }: { params: { athleteId: string } }
     queryFn: async () => {
       const qs = new URLSearchParams();
       qs.set("profileId", String(profileId));
-      const res = await fetch(`/api/competition/status?${qs.toString()}`);
+      const res = await apiRequest("GET", `/api/competition/status?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load competition status");
       return res.json();
     },
@@ -170,7 +171,7 @@ export default function BadgesPage({ params }: { params: { athleteId: string } }
       const qs = new URLSearchParams();
       qs.set("sport", sport);
       if (level) qs.set("level", level);
-      const res = await fetch(`/api/badges?${qs.toString()}`);
+      const res = await apiRequest("GET", `/api/badges?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load badges");
       return res.json();
     },
@@ -184,7 +185,7 @@ export default function BadgesPage({ params }: { params: { athleteId: string } }
       const qs = new URLSearchParams();
       qs.set("sport", sport);
       if (level) qs.set("level", level);
-      const res = await fetch(`/api/athletes/${athleteId}/badge-progress?${qs.toString()}`);
+      const res = await apiRequest("GET", `/api/athletes/${athleteId}/badge-progress?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load badge progress");
       return res.json();
     },

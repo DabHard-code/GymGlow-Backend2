@@ -1,5 +1,5 @@
 // server/routes.ts
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
 import {
@@ -61,6 +61,20 @@ function safeVideoExtension(videoPath: string | null | undefined): string {
   const ext = path.extname(clean);
   const allowed = new Set([".mp4", ".mov", ".m4v", ".webm", ".qt", ".hevc"]);
   return allowed.has(ext) ? ext : ".mp4";
+}
+
+function videoPathBelongsToUserProfile(
+  videoPath: string,
+  userId: string,
+  profileId: string,
+): boolean {
+  const parts = videoPath.split("/").filter(Boolean);
+  return (
+    parts.length >= 3 &&
+    parts[0] === userId &&
+    parts.includes(profileId) &&
+    !parts.some((part) => part === "." || part === "..")
+  );
 }
 
 function looksLikeVideoHeader(header: Buffer): boolean {
@@ -187,10 +201,24 @@ import { and, eq, gte, lte, or, isNull, sql, desc } from "drizzle-orm";
 
 /* ==================== AUTH ==================== */
 
+async function attachVerifiedUser(req: Request, res: Response, next: NextFunction) {
+  const header = req.header("authorization") || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) return next();
+
+  const { data, error } = await supabaseAdmin.auth.getUser(match[1]);
+  if (error || !data.user?.id) {
+    return res.status(401).json({ error: "Invalid or expired auth token" });
+  }
+
+  (req as any).authUserId = data.user.id;
+  next();
+}
+
 function requireUserId(req: Request, res: Response): string | null {
-  const userId = req.header("x-user-id");
+  const userId = (req as any).authUserId as string | undefined;
   if (!userId) {
-    res.status(401).json({ error: "Missing x-user-id header" });
+    res.status(401).json({ error: "Missing Authorization bearer token" });
     return null;
   }
   return userId;
@@ -233,6 +261,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
+  app.use(attachVerifiedUser);
+
   app.get("/api/version", (_req, res) => {
     res.json({ version: "v8411-copy-patched-auth-2026-04-02" });
   });
@@ -297,6 +327,20 @@ export async function registerRoutes(
 
     if (!parsed.success) return res.status(400).json(parsed.error);
 
+    if (parsed.data.profileId) {
+      const profile = await storage.getProfile(parsed.data.profileId);
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+      const athlete = await storage.getAthlete(profile.athleteId);
+      if (!athlete || athlete.userId !== userId) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+
+      if (parsed.data.athleteId && parsed.data.athleteId !== athlete.id) {
+        return res.status(400).json({ error: "Profile does not belong to athlete." });
+      }
+    }
+
     const extension = inferVideoExtension(parsed.data.fileName, parsed.data.mimeType);
     const baseName = sanitizeUploadFileName(parsed.data.fileName).replace(/\.[^.]+$/, "");
     const videoPath = [
@@ -344,6 +388,18 @@ app.post("/api/uploads/video/backend", backendVideoUpload.single("video"), async
   if (!file) return res.status(400).json({ error: "No video file received." });
 
   const profileId = String(req.body?.profileId || "no-profile");
+  const profile = await storage.getProfile(profileId);
+  if (!profile) {
+    await fs.promises.rm(file.path, { force: true }).catch(() => {});
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
+  const athlete = await storage.getAthlete(profile.athleteId);
+  if (!athlete || athlete.userId !== userId) {
+    await fs.promises.rm(file.path, { force: true }).catch(() => {});
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
   const safeBaseName = String(file.originalname || "upload.mp4")
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/\.[^.]+$/, "");
@@ -1003,6 +1059,21 @@ app.get("/billing/portal", async (req, res) => {
 
   const isTrial = !hasPaidAccess && canUseTrial;
 
+  if (!videoPathBelongsToUserProfile(videoPath, userId, profileId)) {
+    return res.status(400).json({ error: "Video path does not belong to this profile." });
+  }
+
+  if (isTrial) {
+    const reserved = await storage.tryConsumeTrialCredit(userId);
+    if (!reserved) {
+      return res.status(402).json({
+        error: "Plan required",
+        required: ["coach", "competition"],
+        current: user.plan,
+      });
+    }
+  }
+
   const session = await storage.createSession({
     profileId,
     isTrial,
@@ -1072,10 +1143,6 @@ app.get("/billing/portal", async (req, res) => {
           sessionId,
         },
       }).catch(() => undefined);
-
-      if (isTrial) {
-        await storage.consumeTrialCredit(userId);
-      }
 
       if (!isTrial && result.awardedBadges?.length) {
         await storage.awardBadges(
@@ -1184,7 +1251,15 @@ await storage.updateSession(sessionId, { status: "ready" });
   // Athlete badge state for the DB-backed catalog.
   // NOTE: We keep compatibility by mapping legacy earned_badges.badge_type to badges.short_name/name.
   app.get("/api/athletes/:athleteId/badge-progress", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const athleteId = req.params.athleteId;
+    const athlete = await storage.getAthlete(athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
     const sport = (req.query.sport as string | undefined) || "gymnastics";
     const levelRaw = req.query.level as string | undefined;
 
@@ -1244,10 +1319,21 @@ await storage.updateSession(sessionId, { status: "ready" });
   });
 
   app.get("/api/athletes/:athleteId/badges", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const athlete = await storage.getAthlete(req.params.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
     res.json(await storage.getBadgesByAthlete(req.params.athleteId));
   });
 
   app.get("/api/analyses/:id/badges", async (req, res) => {
+    const access = await requireAnalysisAccess(req, res, req.params.id);
+    if (!access) return;
+
     res.json(await storage.getBadgesByAnalysis(req.params.id));
   });
 
@@ -1453,6 +1539,10 @@ await storage.updateSession(sessionId, { status: "ready" });
     const profile = await storage.getProfile(profileId);
     if (!profile || profile.athleteId !== athleteId) {
       return res.status(400).json({ error: "Profile does not belong to the selected athlete." });
+    }
+
+    if (!videoPathBelongsToUserProfile(videoPath, auth.userId, profileId)) {
+      return res.status(400).json({ error: "Video path does not belong to this profile." });
     }
 
     // Challenge must be configured with a target skill (GymGlow v1)
@@ -1805,8 +1895,9 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
     const profileId = String(req.query.profileId || "");
     if (!profileId) return res.status(400).json({ error: "profileId is required" });
 
-    const profile = await storage.getProfile(profileId);
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    const access = await requireProfileAccess(req, res, profileId);
+    if (!access) return;
+    const { profile } = access;
 
     const now = new Date();
     const { weekStart, weekEnd } = getWeekWindowSundayFor(now);
@@ -1832,8 +1923,13 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
 
     if (!profileId) return res.status(400).json({ error: "profileId is required" });
 
-    const profile = await storage.getProfile(profileId);
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    const access = await requireProfileAccess(req, res, profileId);
+    if (!access) return;
+    const { profile } = access;
+
+    if (viewerAthleteId && viewerAthleteId !== profile.athleteId) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
 
     // Results are always for the *last completed* week.
     const now = new Date();

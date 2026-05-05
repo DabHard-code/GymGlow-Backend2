@@ -19,7 +19,7 @@ import { compressVideo, type VideoCompressionProgress } from "./video-compress";
 import type { AnalysisResult, SportType, Session } from "@shared/schema";
 import { sportDisplayNames } from "@shared/schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PlanRequiredDialog } from "@/components/plan-required-dialog";
 import { supabase } from "@/lib/supabase";
@@ -369,9 +369,7 @@ export function AnalysisView({
 
       const uploadResponse = await fetch("/api/uploads/video/backend", {
         method: "POST",
-        headers: {
-          "x-user-id": authData.user.id,
-        },
+        headers: await getAuthHeaders(),
         body: formData,
       });
 

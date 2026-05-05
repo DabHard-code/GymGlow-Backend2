@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 
 import { type SportProfile, type SportType, sportDisplayNames } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 type ResultsResponse =
   | {
@@ -71,7 +72,7 @@ export default function CompetitionResultsPage() {
     queryKey: ["/api/competition/results", profileId],
     enabled: Boolean(profileId),
     queryFn: async () => {
-      const res = await fetch(`/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`);
+      const res = await apiRequest("GET", `/api/competition/results?profileId=${encodeURIComponent(profileId)}&viewerAthleteId=${encodeURIComponent(athleteId)}`);
       if (!res.ok) throw new Error("Failed to load results");
       return res.json();
     },

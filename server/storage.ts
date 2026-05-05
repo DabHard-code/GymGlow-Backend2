@@ -85,6 +85,7 @@ export interface IStorage {
   ): Promise<User>;
 
   consumeTrialCredit(userId: string): Promise<User>;
+  tryConsumeTrialCredit(userId: string): Promise<boolean>;
 
   // ===== ATHLETE METHODS =====
   getAthletesByUser(userId: string): Promise<Athlete[]>;
@@ -319,6 +320,16 @@ export class DatabaseStorage implements IStorage {
 
     // If no row updated (already 0), just return current
     return user ?? (await this.getUser(userId))!;
+  }
+
+  async tryConsumeTrialCredit(userId: string): Promise<boolean> {
+    const [user] = await db
+      .update(users)
+      .set({ trialCredits: sql`${users.trialCredits} - 1` })
+      .where(and(eq(users.id, userId), gt(users.trialCredits, 0)))
+      .returning({ id: users.id });
+
+    return Boolean(user);
   }
 
 

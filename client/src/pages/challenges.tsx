@@ -26,7 +26,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { VideoUploadZone } from "@/components/video-upload-zone";
 import { VideoPlayer } from "@/components/video-player";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getAuthHeaders, queryClient, apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import type { Challenge, ChallengeSubmission, Athlete, SportProfile, SportType, DifficultyLevel } from "@shared/schema";
 
@@ -286,8 +286,8 @@ useEffect(() => {
       const res = await fetch(`/api/challenges/${challengeId}/submit`, {
         method: "POST",
         headers: {
+          ...(await getAuthHeaders()),
           "Content-Type": "application/json",
-          "x-user-id": user.id,
           ...(user.email ? { "x-user-email": user.email } : {}),
         },
         body: JSON.stringify(payload),
@@ -332,7 +332,7 @@ onSuccess: (data) => {
 
         const response = await fetch(`/api/submissions/${submissionId}`, {
           headers: {
-            "x-user-id": user.id,
+            ...(await getAuthHeaders()),
             ...(user.email ? { "x-user-email": user.email } : {}),
           },
         });

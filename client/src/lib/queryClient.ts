@@ -25,27 +25,32 @@ function buildUrlFromQueryKey(queryKey: QueryKey): string {
     .join("/");
 }
 
-async function getCurrentUserId(): Promise<string | null> {
+async function getCurrentSessionAuth(): Promise<{ token: string; userId: string } | null> {
   const sessionResult = await supabase.auth.getSession();
-  const sessionUserId = sessionResult.data.session?.user?.id;
-  if (sessionUserId) return sessionUserId;
+  const session = sessionResult.data.session;
+  if (session?.access_token && session.user?.id) {
+    return { token: session.access_token, userId: session.user.id };
+  }
 
-  const userResult = await supabase.auth.getUser();
-  return userResult.data.user?.id ?? null;
+  return null;
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  let userId = await getCurrentUserId();
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  let auth = await getCurrentSessionAuth();
 
-  if (!userId) {
+  if (!auth) {
     for (let i = 0; i < 10; i += 1) {
       await wait(150);
-      userId = await getCurrentUserId();
-      if (userId) break;
+      auth = await getCurrentSessionAuth();
+      if (auth) break;
     }
   }
 
-  return userId ? { "x-user-id": userId } : {};
+  return auth
+    ? {
+        Authorization: `Bearer ${auth.token}`,
+      }
+    : {};
 }
 
 async function throwIfResNotOk(res: Response) {
