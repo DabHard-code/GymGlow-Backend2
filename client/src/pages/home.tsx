@@ -20,7 +20,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AthleteBadgeCollection, BadgeShowcase } from "@/components/badge-display";
 import { OnboardingCarousel, useOnboarding } from "@/components/onboarding";
 import { FeedbackDialog } from "@/components/feedback-dialog";
-import { WelcomeChallengeCard, useWelcomeChallenge } from "@/components/welcome-challenge";
+import WelcomeChallengeCard from "@/components/welcome-challenge";
 import { useToast } from "@/hooks/use-toast";
 import { 
   type Athlete, type SportProfile, sportDisplayNames, sportTypes, skillLevels, 
@@ -530,14 +530,11 @@ function AddAthleteCard() {
 }
 
 export default function Home() {
-  const { data: athletesRaw, isLoading } = useQuery<Athlete[] | null>({
+  const { data: athletes = [], isLoading } = useQuery<Athlete[]>({
     queryKey: ["/api/athletes"],
   });
 
-  const athletes = Array.isArray(athletesRaw) ? athletesRaw : [];
-
   const { showOnboarding, completeOnboarding } = useOnboarding();
-  const { showWelcome, dismissWelcome } = useWelcomeChallenge();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -607,11 +604,9 @@ export default function Home() {
             </p>
           </div>
 
-          {showWelcome && (
-            <div className="mb-6">
-              <WelcomeChallengeCard onDismiss={dismissWelcome} />
-            </div>
-          )}
+          <div className="mb-6">
+            <WelcomeChallengeCard />
+          </div>
 
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
