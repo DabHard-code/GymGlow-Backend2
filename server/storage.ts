@@ -131,6 +131,7 @@ export interface IStorage {
   awardBadge(badge: InsertEarnedBadge): Promise<EarnedBadge>;
   awardBadges(badges: InsertEarnedBadge[]): Promise<EarnedBadge[]>;
   awardCatalogBadgesByShortNames(athleteId: string, shortNames: string[]): Promise<void>;
+  backfillBadgeProgressFromLegacy(): Promise<void>;
   seedBadgeCatalogIfEmpty(): Promise<void>;
 
   // ===== DRILL METHODS =====
@@ -141,6 +142,7 @@ export interface IStorage {
   getDrill(id: string): Promise<Drill | undefined>;
   createDrill(drill: InsertDrill): Promise<Drill>;
   seedDrillsIfEmpty(): Promise<void>;
+  seedDrillSkillLinksIfEmpty(): Promise<void>;
 
 
   // ===== DRILL ↔ SKILL LINK METHODS =====
@@ -559,13 +561,28 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async seedBadgeCatalogIfEmpty(): Promise<void> {
-    const existing = await db.select({ id: badges.id }).from(badges).limit(1);
-    if (existing.length > 0) {
-      console.log("Badge catalog already exists, skipping seed");
-      return;
+  async backfillBadgeProgressFromLegacy(): Promise<void> {
+    const rows = await db.select().from(earnedBadges);
+    const byAthlete = new Map<string, Set<string>>();
+
+    for (const row of rows) {
+      const set = byAthlete.get(row.athleteId) ?? new Set<string>();
+      set.add(String(row.badgeType || "").trim().toLowerCase());
+      byAthlete.set(row.athleteId, set);
     }
 
+    let athleteCount = 0;
+    for (const [athleteId, badgeTypes] of Array.from(byAthlete.entries())) {
+      await this.awardCatalogBadgesByShortNames(athleteId, Array.from(badgeTypes));
+      athleteCount += 1;
+    }
+
+    if (rows.length > 0) {
+      console.log(`Backfilled badge_progress from ${rows.length} legacy earned_badges across ${athleteCount} athletes`);
+    }
+  }
+
+  async seedBadgeCatalogIfEmpty(): Promise<void> {
     const trainingBadges: Array<{
       shortName: BadgeType;
       name: string;
@@ -709,7 +726,7 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    await db.insert(badges).values([
+    const catalogRows = [
       ...trainingBadges.map((badge) => ({
         sport: "gymnastics",
         shortName: badge.shortName,
@@ -742,9 +759,30 @@ export class DatabaseStorage implements IStorage {
         criteriaJson: { compOnly: true },
         sortOrder: badge.sortOrder,
       })),
-    ] as any);
+    ] as any[];
 
-    console.log(`Seeded ${trainingBadges.length + crimsonBadges.length} badge catalog entries`);
+    let inserted = 0;
+    let updated = 0;
+    for (const badge of catalogRows) {
+      const [existing] = await db
+        .select({ id: badges.id })
+        .from(badges)
+        .where(and(eq(badges.sport, badge.sport), eq(badges.name, badge.name)))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(badges)
+          .set(badge)
+          .where(eq(badges.id, existing.id));
+        updated += 1;
+      } else {
+        await db.insert(badges).values(badge);
+        inserted += 1;
+      }
+    }
+
+    console.log(`Badge catalog sync complete (${inserted} inserted, ${updated} updated)`);
   }
 
   // ===== DRILL METHODS =====
@@ -1191,6 +1229,63 @@ export class DatabaseStorage implements IStorage {
     }
   }
   // ===== DRILL ↔ SKILL LINK METHODS =====
+  async seedDrillSkillLinksIfEmpty(): Promise<void> {
+    const drillSkillLinks = [
+      { drillId: "drill_wall_handstand_holds", skillId: "skill_handstand", priority: 10 },
+      { drillId: "drill_handstand_shrugs", skillId: "skill_handstand", priority: 9 },
+      { drillId: "drill_hollow_body_hold", skillId: "skill_hollow_hold", priority: 10 },
+      { drillId: "drill_arch_body_hold", skillId: "skill_arch_hold", priority: 10 },
+      { drillId: "drill_line_drills", skillId: "skill_chasse", priority: 6 },
+      { drillId: "drill_line_drills", skillId: "skill_turn", priority: 5 },
+      { drillId: "drill_beam_pivot_turns", skillId: "skill_turn", priority: 10 },
+      { drillId: "drill_bridge_rocks", skillId: "skill_bridge", priority: 10 },
+      { drillId: "drill_kickover_wedge", skillId: "skill_kickover", priority: 10 },
+      { drillId: "drill_bridge_kickovers_spotted", skillId: "skill_kickover", priority: 8 },
+      { drillId: "drill_cartwheel_panel_mats", skillId: "skill_cartwheel", priority: 10 },
+      { drillId: "drill_roundoff_rebound_stick", skillId: "skill_roundoff", priority: 10 },
+      { drillId: "drill_roundoff_rebound", skillId: "skill_roundoff", priority: 9 },
+      { drillId: "drill_floor_snap_downs", skillId: "skill_roundoff", priority: 8 },
+      { drillId: "drill_back_walkover_spotted", skillId: "skill_back_walkover", priority: 10 },
+      { drillId: "drill_cast_shape_drill", skillId: "skill_cast", priority: 10 },
+      { drillId: "drill_back_hip_circle_drill", skillId: "skill_back_hip_circle", priority: 10 },
+      { drillId: "drill_bar_pullovers", skillId: "skill_pullover", priority: 10 },
+      { drillId: "drill_kip_glide_swings", skillId: "skill_glide_swing", priority: 8 },
+      { drillId: "drill_tight_swing_shapes", skillId: "skill_long_hang", priority: 8 },
+      { drillId: "drill_bar_tap_swings", skillId: "skill_swing_dismount", priority: 8 },
+      { drillId: "drill_beam_cartwheel_mats", skillId: "skill_beam_cartwheel", priority: 10 },
+      { drillId: "drill_beam_kicks", skillId: "skill_scale", priority: 8 },
+      { drillId: "drill_split_leaps_onto_panel", skillId: "skill_split_leap", priority: 10 },
+      { drillId: "drill_straddle_jumps", skillId: "skill_straddle_jump", priority: 10 },
+      { drillId: "drill_tuck_jumps", skillId: "skill_tuck_jump", priority: 10 },
+      { drillId: "drill_floor_jump_half_turn", skillId: "skill_pivot_turn_360", priority: 8 },
+      { drillId: "drill_vault_hurdle_to_board", skillId: "skill_hurdle", priority: 10 },
+      { drillId: "drill_board_punch_rebound", skillId: "skill_straight_jump_rebound", priority: 8 },
+      { drillId: "drill_vault_run_marks", skillId: "skill_hurdle", priority: 7 },
+      { drillId: "drill_back_handspring_downhill", skillId: "skill_back_handspring", priority: 10 },
+      { drillId: "drill_press_handstand_tucks", skillId: "skill_handstand", priority: 6 },
+    ] as const;
+
+    let inserted = 0;
+    for (const link of drillSkillLinks) {
+      const [existing] = await db
+        .select({ id: drillSkills.id })
+        .from(drillSkills)
+        .where(and(eq(drillSkills.drillId, link.drillId), eq(drillSkills.skillId, link.skillId)))
+        .limit(1);
+
+      if (existing) continue;
+
+      const [drill] = await db.select({ id: drills.id }).from(drills).where(eq(drills.id, link.drillId)).limit(1);
+      const [skill] = await db.select({ id: skills.id }).from(skills).where(eq(skills.id, link.skillId)).limit(1);
+      if (!drill || !skill) continue;
+
+      await db.insert(drillSkills).values(link as any);
+      inserted += 1;
+    }
+
+    console.log(`Drill-skill link sync complete (${inserted} inserted)`);
+  }
+
   async getDrillSkillLinksBySkill(skillId: string): Promise<DrillSkillLink[]> {
     return db
       .select()

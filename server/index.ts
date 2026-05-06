@@ -150,6 +150,7 @@ app.get("/api/health", (req: Request, res: Response) => {
     try {
       console.log("Seeding drill library...");
       await storage.seedDrillsIfEmpty();
+      await storage.seedDrillSkillLinksIfEmpty();
       console.log("Drill library seeded successfully");
     } catch (error) {
       console.error("❌ Error seeding drill library:", error);
@@ -174,6 +175,7 @@ app.get("/api/health", (req: Request, res: Response) => {
         "seedBadgesIfEmpty",
         "seedBadges",
       ]);
+      await storage.backfillBadgeProgressFromLegacy();
       console.log("Badge catalog seeded successfully");
     } catch (error) {
       console.error("Error seeding badge catalog:", error);

@@ -1496,7 +1496,14 @@ await storage.updateSession(sessionId, { status: "ready" });
 
     if (active) {
       const all = await storage.getActiveChallenges();
-      const gym = all.filter((c) => c.sport === "gymnastics").slice(0, 3);
+      const seen = new Set<string>();
+      const gym = all.filter((c) => {
+        if (c.sport !== "gymnastics") return false;
+        const key = c.targetSkillId || c.name;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 3);
       return res.json(gym);
     }
     res.json(await storage.getAllChallenges());
