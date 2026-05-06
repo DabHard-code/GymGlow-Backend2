@@ -16,6 +16,8 @@ import {
   meetScores,
   drillSkills,
   competitionPoints,
+  badges,
+  badgeProgress,
   type User,
   type InsertUser,
   type Athlete,
@@ -49,6 +51,7 @@ import {
   type InsertCompetitionPoint,
   type SportType,
   type DifficultyLevel,
+  type BadgeType,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -127,6 +130,8 @@ export interface IStorage {
   getBadgesByAnalysis(analysisId: string): Promise<EarnedBadge[]>;
   awardBadge(badge: InsertEarnedBadge): Promise<EarnedBadge>;
   awardBadges(badges: InsertEarnedBadge[]): Promise<EarnedBadge[]>;
+  awardCatalogBadgesByShortNames(athleteId: string, shortNames: string[]): Promise<void>;
+  seedBadgeCatalogIfEmpty(): Promise<void>;
 
   // ===== DRILL METHODS =====
   getAllDrills(): Promise<Drill[]>;
@@ -502,6 +507,244 @@ export class DatabaseStorage implements IStorage {
     if (badges.length === 0) return [];
     const result = await db.insert(earnedBadges).values(badges as any).returning();
     return result;
+  }
+
+  async awardCatalogBadgesByShortNames(
+    athleteId: string,
+    shortNames: string[],
+  ): Promise<void> {
+    const clean = Array.from(
+      new Set(
+        shortNames
+          .map((name) => String(name || "").trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    if (!clean.length) return;
+
+    const catalogRows = await db
+      .select()
+      .from(badges)
+      .where(inArray(badges.shortName, clean));
+
+    for (const badge of catalogRows) {
+      const [existing] = await db
+        .select()
+        .from(badgeProgress)
+        .where(
+          and(
+            eq(badgeProgress.athleteId, athleteId),
+            eq(badgeProgress.badgeId, badge.id),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(badgeProgress)
+          .set({
+            progressValue: Math.max(existing.progressValue, existing.progressTarget),
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(badgeProgress.id, existing.id));
+      } else {
+        await db.insert(badgeProgress).values({
+          athleteId,
+          badgeId: badge.id,
+          progressValue: 1,
+          progressTarget: 1,
+          contextJson: { source: "catalog_award", shortName: badge.shortName },
+        } as any);
+      }
+    }
+  }
+
+  async seedBadgeCatalogIfEmpty(): Promise<void> {
+    const existing = await db.select({ id: badges.id }).from(badges).limit(1);
+    if (existing.length > 0) {
+      console.log("Badge catalog already exists, skipping seed");
+      return;
+    }
+
+    const trainingBadges: Array<{
+      shortName: BadgeType;
+      name: string;
+      description: string;
+      tier: "common" | "rare" | "epic" | "legendary";
+      icon: string;
+      colorHex: string;
+      bodyFocus: "head" | "arms" | "core" | "legs" | "all";
+      sortOrder: number;
+    }> = [
+      {
+        shortName: "strong_core",
+        name: "Strong Core",
+        description: "Shows stable core control during a skill or routine.",
+        tier: "common",
+        icon: "Shield",
+        colorHex: "#f97316",
+        bodyFocus: "core",
+        sortOrder: 10,
+      },
+      {
+        shortName: "endurance_champ",
+        name: "Endurance Champ",
+        description: "Keeps quality and effort through the whole attempt.",
+        tier: "common",
+        icon: "Timer",
+        colorHex: "#6366f1",
+        bodyFocus: "all",
+        sortOrder: 20,
+      },
+      {
+        shortName: "perfect_lines",
+        name: "Perfect Lines",
+        description: "Demonstrates clean body alignment and polished shapes.",
+        tier: "rare",
+        icon: "Ruler",
+        colorHex: "#3b82f6",
+        bodyFocus: "all",
+        sortOrder: 30,
+      },
+      {
+        shortName: "glow_up",
+        name: "Glow Up",
+        description: "Shows progress, confidence, or improved execution.",
+        tier: "rare",
+        icon: "TrendingUp",
+        colorHex: "#22c55e",
+        bodyFocus: "all",
+        sortOrder: 40,
+      },
+      {
+        shortName: "graceful_flow",
+        name: "Graceful Flow",
+        description: "Moves with smooth rhythm and connected technique.",
+        tier: "rare",
+        icon: "Wind",
+        colorHex: "#06b6d4",
+        bodyFocus: "all",
+        sortOrder: 50,
+      },
+      {
+        shortName: "flexibility_star",
+        name: "Flexibility Star",
+        description: "Displays strong range of motion and pointed shapes.",
+        tier: "epic",
+        icon: "Star",
+        colorHex: "#ec4899",
+        bodyFocus: "legs",
+        sortOrder: 60,
+      },
+      {
+        shortName: "power_move",
+        name: "Power Move",
+        description: "Shows powerful takeoff, snap, block, or explosive action.",
+        tier: "epic",
+        icon: "Zap",
+        colorHex: "#eab308",
+        bodyFocus: "legs",
+        sortOrder: 70,
+      },
+      {
+        shortName: "precision_master",
+        name: "Precision Master",
+        description: "Executes details with control, timing, and accuracy.",
+        tier: "epic",
+        icon: "Target",
+        colorHex: "#ef4444",
+        bodyFocus: "all",
+        sortOrder: 80,
+      },
+      {
+        shortName: "amazing_balance",
+        name: "Amazing Balance",
+        description: "Maintains impressive balance and body control.",
+        tier: "legendary",
+        icon: "Scale",
+        colorHex: "#a855f7",
+        bodyFocus: "core",
+        sortOrder: 90,
+      },
+      {
+        shortName: "rising_star",
+        name: "Rising Star",
+        description: "Shows big potential and a strong training mindset.",
+        tier: "legendary",
+        icon: "Sparkles",
+        colorHex: "#f59e0b",
+        bodyFocus: "all",
+        sortOrder: 100,
+      },
+    ];
+
+    const crimsonBadges = [
+      {
+        shortName: "crimson_challenger",
+        name: "Crimson Challenger",
+        description: "Completes a Competition Mode challenge.",
+        icon: "Trophy",
+        sortOrder: 200,
+      },
+      {
+        shortName: "crimson_top_ten",
+        name: "Crimson Top 10",
+        description: "Finishes in the top 10 during a competition week.",
+        icon: "Medal",
+        sortOrder: 210,
+      },
+      {
+        shortName: "crimson_weekly_champion",
+        name: "Weekly Champion",
+        description: "Finishes first on a competition leaderboard.",
+        icon: "Crown",
+        sortOrder: 220,
+      },
+      {
+        shortName: "crimson_consistency",
+        name: "Crimson Consistency",
+        description: "Completes multiple competition challenges in one week.",
+        icon: "Flame",
+        sortOrder: 230,
+      },
+    ];
+
+    await db.insert(badges).values([
+      ...trainingBadges.map((badge) => ({
+        sport: "gymnastics",
+        shortName: badge.shortName,
+        name: badge.name,
+        description: badge.description,
+        tier: badge.tier,
+        colorHex: badge.colorHex,
+        icon: badge.icon,
+        isCompOnly: false,
+        levelMin: null,
+        levelMax: null,
+        bodyFocus: badge.bodyFocus,
+        criteriaType: "ai_awarded",
+        criteriaJson: { legacyBadgeType: badge.shortName },
+        sortOrder: badge.sortOrder,
+      })),
+      ...crimsonBadges.map((badge) => ({
+        sport: "gymnastics",
+        shortName: badge.shortName,
+        name: badge.name,
+        description: badge.description,
+        tier: "crimson",
+        colorHex: "#dc143c",
+        icon: badge.icon,
+        isCompOnly: true,
+        levelMin: null,
+        levelMax: null,
+        bodyFocus: "all",
+        criteriaType: "competition",
+        criteriaJson: { compOnly: true },
+        sortOrder: badge.sortOrder,
+      })),
+    ] as any);
+
+    console.log(`Seeded ${trainingBadges.length + crimsonBadges.length} badge catalog entries`);
   }
 
   // ===== DRILL METHODS =====

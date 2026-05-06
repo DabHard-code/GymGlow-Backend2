@@ -1152,6 +1152,9 @@ app.get("/billing/portal", async (req, res) => {
             badgeType,
           })),
         );
+        await storage
+          .awardCatalogBadgesByShortNames(athleteId, result.awardedBadges)
+          .catch(() => undefined);
       }
       // Keep optimized video in Supabase for playback, history, and recent results.
 await storage.updateSession(sessionId, { status: "ready" });
@@ -1687,6 +1690,10 @@ await storage.updateSession(sessionId, { status: "ready" });
             status: "scored",
           },
         }).catch(() => undefined);
+
+        await storage
+          .awardCatalogBadgesByShortNames(athleteId, ["crimson_challenger"])
+          .catch(() => undefined);
 
         const challengeScoreBonus = Math.floor(finalScore / 10) * 5;
         if (challengeScoreBonus > 0) {

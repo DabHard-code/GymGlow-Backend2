@@ -167,6 +167,18 @@ app.get("/api/health", (req: Request, res: Response) => {
     } catch (error) {
       console.error("❌ Error seeding challenges:", error);
     }
+    try {
+      console.log("Seeding badge catalog...");
+      await callSeed("Badge catalog seed", [
+        "seedBadgeCatalogIfEmpty",
+        "seedBadgesIfEmpty",
+        "seedBadges",
+      ]);
+      console.log("Badge catalog seeded successfully");
+    } catch (error) {
+      console.error("Error seeding badge catalog:", error);
+    }
+
     // 7) Start server
     const port = parseInt(process.env.PORT || "5000", 10);
     httpServer.listen({ port }, () => {
