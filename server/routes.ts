@@ -1156,6 +1156,11 @@ app.get("/billing/portal", async (req, res) => {
           .awardCatalogBadgesByShortNames(athleteId, result.awardedBadges)
           .catch(() => undefined);
       }
+      if (!isTrial) {
+        await storage
+          .awardEligibleCatalogBadgesForAnalysis(athleteId, profileId, analysis.id)
+          .catch((err) => console.warn("Catalog badge rule evaluation failed:", err));
+      }
       // Keep optimized video in Supabase for playback, history, and recent results.
 await storage.updateSession(sessionId, { status: "ready" });
     } catch (err) {

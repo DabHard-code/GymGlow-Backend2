@@ -131,6 +131,12 @@ export interface IStorage {
   awardBadge(badge: InsertEarnedBadge): Promise<EarnedBadge>;
   awardBadges(badges: InsertEarnedBadge[]): Promise<EarnedBadge[]>;
   awardCatalogBadgesByShortNames(athleteId: string, shortNames: string[]): Promise<void>;
+  awardEligibleCatalogBadgesForAnalysis(
+    athleteId: string,
+    profileId: string,
+    analysisId: string,
+  ): Promise<string[]>;
+  backfillEligibleCatalogBadgesFromAnalyses(): Promise<void>;
   backfillBadgeProgressFromLegacy(): Promise<void>;
   seedBadgeCatalogIfEmpty(): Promise<void>;
 
@@ -558,6 +564,128 @@ export class DatabaseStorage implements IStorage {
           contextJson: { source: "catalog_award", shortName: badge.shortName },
         } as any);
       }
+    }
+  }
+
+  async awardEligibleCatalogBadgesForAnalysis(
+    athleteId: string,
+    profileId: string,
+    analysisId: string,
+  ): Promise<string[]> {
+    const profile = await this.getProfile(profileId);
+    const current = await this.getAnalysis(analysisId);
+    if (!profile || !current) return [];
+
+    const profileSessions = await this.getSessionsByProfile(profileId);
+    if (!profileSessions.length) return [];
+
+    const sessionIds = profileSessions.map((session) => session.id);
+    const profileAnalyses = await db
+      .select()
+      .from(analyses)
+      .where(inArray(analyses.sessionId, sessionIds))
+      .orderBy(desc(analyses.createdAt));
+
+    const catalogRows = await db
+      .select()
+      .from(badges)
+      .where(eq(badges.sport, profile.sport as any));
+
+    const currentAt = current.createdAt ? new Date(current.createdAt) : new Date();
+    const currentTime = currentAt.getTime();
+    const earnedShortNames: string[] = [];
+
+    const scoreToPoints = (score: unknown): number => {
+      const n = Number(score);
+      if (!Number.isFinite(n)) return Number.POSITIVE_INFINITY;
+      return n <= 10 ? n * 10 : n;
+    };
+
+    const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
+    const addDays = (date: Date, delta: number): Date => {
+      const next = new Date(date);
+      next.setUTCDate(next.getUTCDate() + delta);
+      return next;
+    };
+
+    const analysesOnOrBeforeCurrent = profileAnalyses.filter((analysis) => {
+      const createdAt = analysis.createdAt ? new Date(analysis.createdAt).getTime() : 0;
+      return createdAt <= currentTime;
+    });
+
+    for (const badge of catalogRows) {
+      const shortName = String(badge.shortName || "").trim();
+      if (!shortName) continue;
+
+      const criteria = (badge.criteriaJson || {}) as Record<string, unknown>;
+      const count = Math.max(1, Number(criteria.count || 1));
+      let shouldAward = false;
+
+      if (badge.criteriaType === "upload_count") {
+        const windowDays = Number(criteria.windowDays || 0);
+        const since = windowDays > 0 ? addDays(currentAt, -windowDays).getTime() : 0;
+        const uploadCount = analysesOnOrBeforeCurrent.filter((analysis) => {
+          const createdAt = analysis.createdAt ? new Date(analysis.createdAt).getTime() : 0;
+          return createdAt >= since;
+        }).length;
+        shouldAward = uploadCount >= count;
+      } else if (badge.criteriaType === "streak") {
+        const type = String(criteria.type || "");
+        if (type === "upload_score") {
+          const minScore = scoreToPoints(criteria.min ?? criteria.minScore ?? 0);
+          const qualifyingCount = analysesOnOrBeforeCurrent.filter(
+            (analysis) => analysis.overallScore >= minScore,
+          ).length;
+          shouldAward = qualifyingCount >= count;
+        } else if (type === "upload_days") {
+          const minScore = scoreToPoints(criteria.minScore ?? 0);
+          const qualifyingDays = new Set(
+            analysesOnOrBeforeCurrent
+              .filter((analysis) => analysis.overallScore >= minScore)
+              .map((analysis) => dayKey(new Date(analysis.createdAt || currentAt))),
+          );
+
+          let consecutiveDays = 0;
+          for (let i = 0; i < count; i += 1) {
+            const key = dayKey(addDays(currentAt, -i));
+            if (!qualifyingDays.has(key)) break;
+            consecutiveDays += 1;
+          }
+          shouldAward = consecutiveDays >= count;
+        }
+      }
+
+      if (shouldAward) earnedShortNames.push(shortName);
+    }
+
+    await this.awardCatalogBadgesByShortNames(athleteId, earnedShortNames);
+    return earnedShortNames;
+  }
+
+  async backfillEligibleCatalogBadgesFromAnalyses(): Promise<void> {
+    const profiles = await db.select().from(sportProfiles);
+    let evaluated = 0;
+    let awarded = 0;
+
+    for (const profile of profiles) {
+      const recentAnalyses = await this.getRecentAnalysesByProfile(profile.id, 1);
+      const latestAnalysis = recentAnalyses[0];
+      if (!latestAnalysis) continue;
+
+      const earned = await this.awardEligibleCatalogBadgesForAnalysis(
+        profile.athleteId,
+        profile.id,
+        latestAnalysis.id,
+      );
+
+      evaluated += 1;
+      awarded += earned.length;
+    }
+
+    if (evaluated > 0) {
+      console.log(
+        `Backfilled catalog badge rules for ${evaluated} profiles (${awarded} rule matches)`,
+      );
     }
   }
 
