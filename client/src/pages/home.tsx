@@ -161,7 +161,14 @@ function AthleteCard({ athlete }: { athlete: Athlete }) {
             {athlete.name.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <CardTitle className="text-lg flex-1">{athlete.name}</CardTitle>
+        <div className="flex-1 min-w-0">
+          <CardTitle className="text-lg truncate">{athlete.name}</CardTitle>
+          {athlete.publicDisplayName && (
+            <p className="text-xs text-muted-foreground truncate">
+              Leaderboard: {athlete.publicDisplayName}
+            </p>
+          )}
+        </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button 

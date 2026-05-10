@@ -123,12 +123,14 @@ export default function SettingsPage() {
   // ---------- Athlete editing ----------
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editPublicDisplayName, setEditPublicDisplayName] = useState("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
 
   const updateAthleteMutation = useMutation({
-    mutationFn: async (payload: { athleteId: string; name: string; avatarUrl?: string }) => {
+    mutationFn: async (payload: { athleteId: string; name: string; publicDisplayName: string; avatarUrl?: string }) => {
       const res = await apiRequest("PUT", `/api/athletes/${payload.athleteId}`, {
         name: payload.name,
+        publicDisplayName: payload.publicDisplayName,
         avatarUrl: payload.avatarUrl || undefined,
       });
       return res.json();
@@ -185,6 +187,7 @@ export default function SettingsPage() {
   const openEdit = () => {
     if (!selectedAthlete) return;
     setEditName(selectedAthlete.name);
+    setEditPublicDisplayName(selectedAthlete.publicDisplayName ?? "");
     setEditAvatarUrl(selectedAthlete.avatarUrl ?? "");
     setEditOpen(true);
   };
@@ -432,6 +435,19 @@ export default function SettingsPage() {
                         <Input className="mt-1" value={editName} onChange={(e) => setEditName(e.target.value)} />
                       </div>
                       <div>
+                        <Label>Public leaderboard name</Label>
+                        <Input
+                          className="mt-1"
+                          value={editPublicDisplayName}
+                          onChange={(e) => setEditPublicDisplayName(e.target.value)}
+                          placeholder="Beam Star 124"
+                          maxLength={32}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Shown on leaderboards. Do not use a child's full real name.
+                        </p>
+                      </div>
+                      <div>
                         <Label>Avatar URL (optional)</Label>
                         <Input className="mt-1" value={editAvatarUrl} onChange={(e) => setEditAvatarUrl(e.target.value)} />
                       </div>
@@ -443,6 +459,7 @@ export default function SettingsPage() {
                           updateAthleteMutation.mutate({
                             athleteId: selectedAthlete.id,
                             name: editName.trim(),
+                            publicDisplayName: editPublicDisplayName.trim(),
                             avatarUrl: editAvatarUrl.trim() || undefined,
                           });
                         }}

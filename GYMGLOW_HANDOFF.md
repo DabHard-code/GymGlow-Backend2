@@ -11,12 +11,13 @@ Last updated: 2026-05-10
 - Profile pages now include individual analysis/result deletion. `DELETE /api/analyses/:id` requires ownership, removes the analysis row, tied earned badges, analysis-sourced competition points, any leftover stored video path, and the parent session when it no longer has analyses.
 - Added public `/privacy-choices` page for account/data deletion instructions outside the logged-in app. Use this as the Google Play data deletion URL and optionally Apple privacy choices URL.
 - Added persisted in-app support/safety reporting. The Feedback dialog posts to `POST /api/support-reports` and stores reports in the new `support_reports` table.
+- Added safe public leaderboard aliases with `athletes.public_display_name`. Private athlete names remain inside the user's account; leaderboard/result endpoints return public aliases and `isViewer` instead of exposing athlete IDs.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check and production build passed after the repair work, result deletion pass, privacy choices pass, and support-report pass.
+- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, and public leaderboard alias pass.
 
 ## Latest Supabase Audit
 
@@ -67,7 +68,7 @@ After first badge earning logic pass:
 ## Recommended Next Steps
 
 1. Test individual result deletion with a disposable user that has earned badges/competition points, then confirm the result disappears from the profile.
-2. Run `npm run db:push` before deploying the support-report feature, because it adds the `support_reports` table.
+2. After deploying, test Settings -> edit athlete -> public leaderboard name, then confirm leaderboard rows show the alias and not a private athlete name.
 3. In app store consoles, set Privacy Policy URL to `/privacy` and Google Play data deletion URL to `/privacy-choices`.
 4. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
 

@@ -37,6 +37,7 @@ export const athletes = pgTable("athletes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
+  publicDisplayName: text("public_display_name"),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });

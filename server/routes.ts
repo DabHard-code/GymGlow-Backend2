@@ -22,6 +22,43 @@ import { getStripe, getPriceIdForPlan, planFromPriceId, type PaidPlan } from "./
 
 /* ==================== VIDEO FILE DOWNLOAD HELPERS ==================== */
 
+const PUBLIC_ALIAS_WORDS = [
+  "Beam Star",
+  "Vault Spark",
+  "Floor Flyer",
+  "Bar Bright",
+  "Glow Champ",
+  "Landing Star",
+  "Core Spark",
+  "Balance Ace",
+];
+
+function hashToNumber(input: string) {
+  // Simple stable hash for anonymous naming (not security-related)
+  let h = 0;
+  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function generatedPublicAlias(athleteId: string): string {
+  const hash = hashToNumber(athleteId);
+  const label = PUBLIC_ALIAS_WORDS[hash % PUBLIC_ALIAS_WORDS.length];
+  return `${label} ${String(hash % 1000).padStart(3, "0")}`;
+}
+
+function publicAliasForAthlete(athlete: { id: string; publicDisplayName?: string | null }): string {
+  return athlete.publicDisplayName?.trim() || generatedPublicAlias(athlete.id);
+}
+
+function sanitizePublicAlias(input: string): string {
+  return input
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-zA-Z0-9 #.'-]/g, "")
+    .slice(0, 32)
+    .trim();
+}
+
 
 function sanitizeUploadFileName(fileName: string | null | undefined): string {
   const raw = String(fileName || "upload.mp4");
@@ -815,8 +852,13 @@ app.get("/billing/portal", async (req, res) => {
 
   const createAthleteSchema = z.object({
     name: z.string().min(1),
+    publicDisplayName: z.string().optional(),
     avatarUrl: z.string().optional(),
   });
+  const updateAthleteSchema = createAthleteSchema.partial().refine(
+    (value) => value.name !== undefined || value.publicDisplayName !== undefined || value.avatarUrl !== undefined,
+    { message: "No updates provided" },
+  );
 
   app.get("/api/athletes", async (req, res) => {
     const userId = requireUserId(req, res);
@@ -905,7 +947,51 @@ app.get("/billing/portal", async (req, res) => {
     const parsed = createAthleteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
 
-    res.status(201).json(await storage.createAthlete({ userId, ...parsed.data }));
+    const publicDisplayName = parsed.data.publicDisplayName
+      ? sanitizePublicAlias(parsed.data.publicDisplayName)
+      : undefined;
+
+    const athlete = await storage.createAthlete({
+      userId,
+      name: parsed.data.name.trim(),
+      avatarUrl: parsed.data.avatarUrl,
+      publicDisplayName,
+    });
+
+    if (!athlete.publicDisplayName) {
+      const updated = await storage.updateAthlete(athlete.id, {
+        publicDisplayName: generatedPublicAlias(athlete.id),
+      } as any);
+      return res.status(201).json(updated ?? athlete);
+    }
+
+    res.status(201).json(athlete);
+  });
+
+  app.put("/api/athletes/:athleteId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const athlete = await storage.getAthlete(req.params.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
+    const parsed = updateAthleteSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const updates: Record<string, unknown> = {};
+    if (parsed.data.name !== undefined) updates.name = parsed.data.name.trim();
+    if (parsed.data.avatarUrl !== undefined) updates.avatarUrl = parsed.data.avatarUrl || null;
+    if (parsed.data.publicDisplayName !== undefined) {
+      const alias = sanitizePublicAlias(parsed.data.publicDisplayName);
+      if (alias.length < 3) {
+        return res.status(400).json({ error: "Public leaderboard name must be at least 3 characters." });
+      }
+      updates.publicDisplayName = alias;
+    }
+
+    res.json(await storage.updateAthlete(athlete.id, updates as any));
   });
 
   /* ==================== PROFILES ==================== */
@@ -1909,20 +1995,24 @@ app.get("/billing/portal", async (req, res) => {
     const profileId = String(req.query.profileId || "");
     if (!profileId) return res.status(400).json({ error: "Missing profileId" });
 
+    const access = await requireProfileAccess(req, res, profileId);
+    if (!access) return;
+
     const { weekStart, weekEnd } = getWeekWindowSundayFor(new Date());
 
     const rows = await storage.getWeeklyLeaderboard(profileId, weekStart, weekEnd);
 
-    const entries = rows.map((row, idx) => {
-      const n = hashToNumber(row.athleteId) % 10000;
+    const entries = await Promise.all(rows.map(async (row, idx) => {
+      const athlete = await storage.getAthlete(row.athleteId);
       return {
         rank: idx + 1,
         points: row.points,
         challengesCompleted: row.challengesCompleted,
         aiBonus: row.aiBonus,
-        displayName: `GymGlow Star #${String(n).padStart(4, "0")}`,
+        displayName: athlete ? publicAliasForAthlete(athlete) : generatedPublicAlias(row.athleteId),
+        isViewer: row.athleteId === access.athlete.id,
       };
-    });
+    }));
 
     const locked = user?.plan !== "competition";
     if (locked) {
@@ -1981,20 +2071,13 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
       rank: idx + 1,
       score: row.submission.score,
       submittedAt: row.submission.submittedAt,
-      displayName: `GymGlow Star #${String((idx + 1) * 137).padStart(3, "0")}`,
+      displayName: publicAliasForAthlete(row.athlete),
     }));
 
     res.json(anon);
   });
 
   /* ==================== COMPETITION MODE: END OF WEEK RESULTS ==================== */
-
-  function hashToNumber(input: string) {
-    // Simple stable hash for anonymous naming (not security-related)
-    let h = 0;
-    for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
-    return h;
-  }
 
   function getWeekWindowSundayFor(date: Date) {
     const weekStart = new Date(date);
@@ -2161,17 +2244,16 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
       .filter((x) => x.best > 0)
       .sort((a, b) => (b.avgTop2 - a.avgTop2) || (b.best - a.best) || (b.second - a.second));
 
-    const top10 = leaderboard.slice(0, 10).map((row, idx) => {
-      const n = hashToNumber(row.athleteId) % 9000;
-      const displayName = `Glow Star #${String(n).padStart(4, "0")}`;
+    const top10 = await Promise.all(leaderboard.slice(0, 10).map(async (row, idx) => {
+      const athlete = await storage.getAthlete(row.athleteId);
       return {
         rank: idx + 1,
-        displayName,
+        displayName: athlete ? publicAliasForAthlete(athlete) : generatedPublicAlias(row.athleteId),
         avgTop2: Math.round(row.avgTop2 * 10) / 10,
         best: row.best,
         second: row.second,
       };
-    });
+    }));
 
     const viewerRowIdx = viewerAthleteId
       ? leaderboard.findIndex((r) => r.athleteId === viewerAthleteId)

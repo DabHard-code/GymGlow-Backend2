@@ -41,6 +41,7 @@ type WeeklyLeaderboardResponse = {
   entries?: Array<{
     rank: number;
     displayName: string;
+    isViewer?: boolean;
     points: number;
     challengesCompleted: number;
     aiBonus: number;
@@ -293,7 +294,7 @@ const { data: athletes = [] } = useQuery<Athlete[]>({
               ? "bg-orange-50 border-orange-400"
               : "bg-white";
 
-          const isYou = e.athleteId && selectedAthleteId && e.athleteId === selectedAthleteId;
+          const isYou = e.isViewer === true;
 
           return (
             <div
