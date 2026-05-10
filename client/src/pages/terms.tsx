@@ -4,7 +4,7 @@ export default function TermsPage() {
       <h1 className="text-3xl font-bold">GymGlow Terms & Conditions</h1>
 
       <p className="text-sm text-muted-foreground">
-        Last Updated: {new Date().toLocaleDateString()}
+        Last Updated: May 10, 2026
       </p>
 
       <section className="space-y-4">
@@ -33,6 +33,8 @@ export default function TermsPage() {
         <p>
           GymGlow is intended for use by parents, guardians, coaches, and athletes
           under supervision. Users under 18 must have parental or guardian consent.
+          Users under 13 may only use GymGlow through a parent, guardian, or other
+          authorized adult.
         </p>
       </section>
 
@@ -67,6 +69,11 @@ export default function TermsPage() {
           GymGlow reserves the right to remove content that violates community
           standards or applicable laws.
         </p>
+        <p>
+          You may not upload content that is abusive, harassing, sexually explicit,
+          exploitative, unsafe, illegal, or that violates another person's privacy
+          or rights, especially content involving minors.
+        </p>
       </section>
 
       <section className="space-y-4">
@@ -79,6 +86,10 @@ export default function TermsPage() {
         <p>
           Users are responsible for consulting qualified coaches or professionals
           for official scoring, training decisions, and injury prevention.
+        </p>
+        <p>
+          If AI feedback appears unsafe, inappropriate, or inaccurate, report it
+          through Settings or contact support@gymglow.app so it can be reviewed.
         </p>
       </section>
 
@@ -129,6 +140,10 @@ export default function TermsPage() {
           You may delete your account from the Settings page. Account deletion
           removes your app data from GymGlow, while billing records may remain
           with payment processors where legally or operationally required.
+        </p>
+        <p>
+          If you cannot log in, visit /privacy-choices for account and data
+          deletion request instructions.
         </p>
       </section>
 

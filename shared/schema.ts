@@ -517,6 +517,26 @@ export const insertChallengeSubmissionSchema = createInsertSchema(challengeSubmi
 export type InsertChallengeSubmission = z.infer<typeof insertChallengeSubmissionSchema>;
 export type ChallengeSubmission = typeof challengeSubmissions.$inferSelect;
 
+export const supportReports = pgTable("support_reports", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  type: text("type").notNull().$type<"bug" | "feature" | "question" | "safety" | "ai_feedback">(),
+  email: text("email"),
+  message: text("message").notNull(),
+  context: jsonb("context").$type<Record<string, unknown>>(),
+  status: text("status").notNull().default("open").$type<"open" | "reviewed" | "closed">(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSupportReportSchema = createInsertSchema(supportReports).omit({
+  id: true,
+  status: true,
+  createdAt: true,
+});
+
+export type InsertSupportReport = z.infer<typeof insertSupportReportSchema>;
+export type SupportReport = typeof supportReports.$inferSelect;
+
 export const competitionPoints = pgTable("competition_points", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   athleteId: varchar("athlete_id").notNull().references(() => athletes.id),

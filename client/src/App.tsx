@@ -9,6 +9,7 @@ import NotificationSettingsPage from "@/pages/notification-settings";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import PrivacyPage from "@/pages/privacy";
+import PrivacyChoicesPage from "@/pages/privacy-choices";
 import TermsPage from "@/pages/terms";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
@@ -254,6 +255,11 @@ function Router() {
 <Route
   path="/privacy"
   component={() => <PrivacyPage />}
+/>
+
+<Route
+  path="/privacy-choices"
+  component={() => <PrivacyChoicesPage />}
 />
 
 

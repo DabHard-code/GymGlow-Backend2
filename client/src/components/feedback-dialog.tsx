@@ -14,11 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-type FeedbackType = "bug" | "feature" | "question";
+type FeedbackType = "bug" | "feature" | "question" | "safety" | "ai_feedback";
 
 const feedbackTypes: { value: FeedbackType; label: string; icon: typeof Bug }[] = [
   { value: "bug", label: "Bug Report", icon: Bug },
+  { value: "safety", label: "Safety Issue", icon: HelpCircle },
+  { value: "ai_feedback", label: "AI Feedback", icon: MessageSquare },
   { value: "feature", label: "Feature Request", icon: Lightbulb },
   { value: "question", label: "Question", icon: HelpCircle },
 ];
@@ -42,21 +45,35 @@ export function FeedbackDialog() {
     }
 
     setIsSubmitting(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    console.log("Feedback submitted:", { type, email, message });
-    
-    toast({
-      title: "Thank you!",
-      description: "Your feedback has been submitted. We'll review it soon.",
-    });
-    
-    setType("bug");
-    setEmail("");
-    setMessage("");
-    setOpen(false);
-    setIsSubmitting(false);
+
+    try {
+      await apiRequest("POST", "/api/support-reports", {
+        type,
+        email: email.trim() || undefined,
+        message: message.trim(),
+        context: {
+          path: window.location.pathname,
+        },
+      });
+
+      toast({
+        title: "Thank you!",
+        description: "Your report has been submitted for review.",
+      });
+
+      setType("bug");
+      setEmail("");
+      setMessage("");
+      setOpen(false);
+    } catch (error) {
+      toast({
+        title: "Could not submit report",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,14 +89,14 @@ export function FeedbackDialog() {
           <span className="hidden sm:inline">Feedback</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
             Send Feedback
           </DialogTitle>
           <DialogDescription>
-            Found an issue or have a suggestion? We'd love to hear from you!
+            Report bugs, safety concerns, or AI feedback issues for review.
           </DialogDescription>
         </DialogHeader>
         
@@ -89,7 +106,7 @@ export function FeedbackDialog() {
             <RadioGroup
               value={type}
               onValueChange={(v) => setType(v as FeedbackType)}
-              className="flex gap-2"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
             >
               {feedbackTypes.map((ft) => {
                 const Icon = ft.icon;

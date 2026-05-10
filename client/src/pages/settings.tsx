@@ -595,6 +595,10 @@ export default function SettingsPage() {
     <Link href="/privacy">Privacy</Link>
   </Button>
 
+  <Button asChild variant="outline">
+    <Link href="/privacy-choices">Privacy Choices</Link>
+  </Button>
+
 </CardContent>
         </Card>
       </main>

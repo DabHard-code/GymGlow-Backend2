@@ -552,6 +552,35 @@ app.post("/api/uploads/video/backend", backendVideoUpload.single("video"), async
     res.json({ success: true, deleted, storageObjectsDeleted });
   });
 
+  app.post("/api/support-reports", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    await storage.ensureUserFromAuth(userId);
+
+    const parsed = z.object({
+      type: z.enum(["bug", "feature", "question", "safety", "ai_feedback"]),
+      email: z.string().email().optional().or(z.literal("")),
+      message: z.string().trim().min(1).max(4000),
+      context: z.record(z.unknown()).optional(),
+    }).safeParse(req.body ?? {});
+
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const report = await storage.createSupportReport({
+      userId,
+      type: parsed.data.type,
+      email: parsed.data.email || null,
+      message: parsed.data.message,
+      context: {
+        ...(parsed.data.context ?? {}),
+        userAgent: req.header("user-agent") ?? null,
+      },
+    });
+
+    res.status(201).json({ success: true, id: report.id });
+  });
+
   // Disabled: plans must be changed by Stripe/webhook, not by client request.
   app.post("/api/users/me/plan", (_req, res) => {
     return res.status(403).json({ error: "Plan changes must go through billing." });

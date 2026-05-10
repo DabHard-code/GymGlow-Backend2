@@ -16,6 +16,7 @@ import {
   meetScores,
   drillSkills,
   competitionPoints,
+  supportReports,
   badges,
   badgeProgress,
   type User,
@@ -49,6 +50,8 @@ import {
   type DrillSkillLink,
   type CompetitionPoint,
   type InsertCompetitionPoint,
+  type SupportReport,
+  type InsertSupportReport,
   type SportType,
   type DifficultyLevel,
   type BadgeType,
@@ -100,10 +103,12 @@ export interface IStorage {
     skillProgress: number;
     challengeSubmissions: number;
     competitionPoints: number;
+    supportReports: number;
     seasons: number;
     meets: number;
     meetScores: number;
   }>;
+  createSupportReport(report: InsertSupportReport): Promise<SupportReport>;
 
   // ===== ATHLETE METHODS =====
   getAthletesByUser(userId: string): Promise<Athlete[]>;
@@ -377,6 +382,7 @@ export class DatabaseStorage implements IStorage {
     skillProgress: number;
     challengeSubmissions: number;
     competitionPoints: number;
+    supportReports: number;
     seasons: number;
     meets: number;
     meetScores: number;
@@ -439,6 +445,7 @@ export class DatabaseStorage implements IStorage {
         skillProgress: 0,
         challengeSubmissions: 0,
         competitionPoints: 0,
+        supportReports: 0,
         seasons: 0,
         meets: 0,
         meetScores: 0,
@@ -516,12 +523,21 @@ export class DatabaseStorage implements IStorage {
         ).length;
       }
 
+      counts.supportReports = (
+        await tx.delete(supportReports).where(eq(supportReports.userId, userId)).returning({ id: supportReports.id })
+      ).length;
+
       counts.users = (
         await tx.delete(users).where(eq(users.id, userId)).returning({ id: users.id })
       ).length;
 
       return counts;
     });
+  }
+
+  async createSupportReport(insertReport: InsertSupportReport): Promise<SupportReport> {
+    const [report] = await db.insert(supportReports).values(insertReport as any).returning();
+    return report;
   }
 
 

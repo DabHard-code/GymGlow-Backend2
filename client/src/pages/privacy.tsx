@@ -4,7 +4,7 @@ export default function PrivacyPage() {
       <h1 className="text-3xl font-bold">GymGlow Privacy Policy</h1>
 
       <p className="text-sm text-muted-foreground">
-        Last Updated: {new Date().toLocaleDateString()}
+        Last Updated: May 10, 2026
       </p>
 
       <section className="space-y-4">
@@ -38,7 +38,8 @@ export default function PrivacyPage() {
         </p>
         <p>
           Parents or guardians are responsible for managing athlete profiles and
-          uploaded content.
+          uploaded content. Videos should only be uploaded by someone who has the
+          right and permission to share them for analysis.
         </p>
       </section>
 
@@ -94,7 +95,8 @@ export default function PrivacyPage() {
         </p>
         <p>
           Information may be shared only with trusted service providers necessary
-          to operate the platform (such as payment processors and hosting providers).
+          to operate the platform, such as hosting, authentication, AI processing,
+          storage, and payment providers.
         </p>
       </section>
 
@@ -105,6 +107,17 @@ export default function PrivacyPage() {
           Settings page. This removes athlete profiles, analyses, session
           history, badges, challenge submissions, and competition activity from
           GymGlow systems.
+        </p>
+        <p>
+          Users may also delete individual analysis results from the athlete
+          profile page without deleting the whole account.
+        </p>
+        <p>
+          If you cannot log in, visit{" "}
+          <a className="underline" href="/privacy-choices">
+            Privacy Choices
+          </a>{" "}
+          for account and data deletion request instructions.
         </p>
         <p>
           Billing records may remain with payment processors where required for
