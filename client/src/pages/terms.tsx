@@ -55,8 +55,13 @@ export default function TermsPage() {
         </p>
         <p>
           You retain ownership of your uploaded content. By uploading, you grant
-          GymGlow a limited license to store, process, and analyze the content
+          GymGlow a limited license to temporarily process and analyze the content
           solely for providing Platform services.
+        </p>
+        <p>
+          Uploaded videos are deleted after analysis completes or fails. GymGlow
+          may keep the resulting scores, feedback, challenge results, badges,
+          and activity records in your account.
         </p>
         <p>
           GymGlow reserves the right to remove content that violates community

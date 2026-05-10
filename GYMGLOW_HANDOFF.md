@@ -5,6 +5,7 @@ Last updated: 2026-05-07
 ## Current State
 
 - App/server use Supabase Postgres for the database. Render hosts the deployed app/server.
+- Uploaded videos are treated as temporary processing files. Successful and failed analyses/challenge submissions remove the Supabase Storage video object and keep only results/metadata.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
@@ -60,12 +61,10 @@ After first badge earning logic pass:
 
 ## Recommended Next Steps
 
-1. Run `script/supabase-health-report.sql` in the Supabase SQL editor.
-2. Review duplicate challenge rows before deleting anything.
-3. Write a controlled duplicate-challenge cleanup that keeps submitted challenge IDs intact.
-4. Normalize badge `short_name` values through safe upserts or a reviewed SQL migration.
-5. Implement the remaining badge earning rules for criteria such as `upload_count`, `score_threshold`, `streak`, and `drills_logged`.
-6. Later, do an App Store readiness pass for privacy, child safety, account deletion, video retention, AI disclosure, and subscriptions.
+1. Add user-facing account deletion and session/result deletion controls.
+2. Add a cleanup script/report for any old Supabase Storage videos from before the temporary-video policy.
+3. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
+4. Do an App Store readiness pass for privacy, child safety, account deletion, AI disclosure, and subscriptions.
 
 ## Important Reminder
 

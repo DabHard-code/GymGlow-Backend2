@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <ul className="list-disc ml-6 text-sm space-y-1">
           <li>Account information (username, email, user ID)</li>
           <li>Athlete profile data (name, level, sport)</li>
-          <li>Uploaded videos and media</li>
+          <li>Temporary uploaded videos for AI processing</li>
           <li>Challenge submissions and scores</li>
           <li>Subscription and billing status (processed via Stripe)</li>
           <li>Basic technical information (device type, browser, IP address)</li>
@@ -61,6 +61,11 @@ export default function PrivacyPage() {
           to generate skill feedback and scoring insights. AI outputs are automated
           estimates and not official judging decisions.
         </p>
+        <p>
+          Videos are used for processing and are deleted after analysis completes
+          or fails. GymGlow keeps the resulting scores, feedback, badge progress,
+          and related activity records.
+        </p>
       </section>
 
       <section className="space-y-4">
@@ -69,6 +74,12 @@ export default function PrivacyPage() {
           We use secure third-party providers (such as Supabase and Stripe)
           to store data and process payments. We implement reasonable safeguards
           to protect user information.
+        </p>
+        <p>
+          Uploaded videos are not retained for playback or history after AI
+          processing. Analysis results and account records may remain available
+          in your account unless deleted according to account settings or support
+          processes.
         </p>
         <p>
           No system is 100% secure, but we strive to protect your data using

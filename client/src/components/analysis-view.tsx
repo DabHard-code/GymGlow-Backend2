@@ -321,7 +321,11 @@ export function AnalysisView({
         setCurrentStep("processing");
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      if (variables?.videoPath) {
+        supabase.storage.from("Videos").remove([variables.videoPath]).catch(() => undefined);
+      }
+
       if (String(error.message).startsWith("402:")) {
         setPlanDialogOpen(true);
         setCurrentStep(null);
@@ -386,11 +390,6 @@ export function AnalysisView({
       }
 
       setOptimizedVideoPath(uploadData.videoPath);
-
-      const signedUrl = await getSignedPlaybackUrl(uploadData.videoPath);
-      if (signedUrl) {
-        setPlaybackUrl(signedUrl);
-      }
 
       analyzeMutation.mutate({
         videoPath: uploadData.videoPath,
@@ -486,7 +485,7 @@ export function AnalysisView({
               </p>
             ) : optimizedVideoPath ? (
               <p className="mt-2 text-sm text-green-700">
-                Optimized MP4 loaded for playback and analysis.
+                Optimized MP4 uploaded for analysis. Video storage is cleared after processing.
               </p>
             ) : isLikelyBadBrowserPreview ? (
               <p className="mt-2 text-sm text-muted-foreground">

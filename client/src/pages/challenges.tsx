@@ -295,6 +295,7 @@ useEffect(() => {
 
       if (!res.ok) {
         const text = (await res.text()) || res.statusText;
+        await supabase.storage.from("Videos").remove([objectPath]).catch(() => undefined);
         throw new Error(`${res.status}: ${text}`);
       }
 

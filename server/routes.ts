@@ -128,6 +128,13 @@ async function writeSupabaseBlobToVideoFile(data: Blob, outputPath: string): Pro
   }
 }
 
+async function removeStoredVideo(videoPath: string, label: string): Promise<void> {
+  const { error } = await supabaseAdmin.storage.from("Videos").remove([videoPath]);
+  if (error) {
+    console.warn(`Could not remove ${label} video from Supabase Storage:`, error.message);
+  }
+}
+
 
 /* ==================== DRILL MATCHING HELPERS ==================== */
 
@@ -1161,14 +1168,15 @@ app.get("/billing/portal", async (req, res) => {
           .awardEligibleCatalogBadgesForAnalysis(athleteId, profileId, analysis.id)
           .catch((err) => console.warn("Catalog badge rule evaluation failed:", err));
       }
-      // Keep optimized video in Supabase for playback, history, and recent results.
-await storage.updateSession(sessionId, { status: "ready" });
+      await removeStoredVideo(videoPath, "analysis");
+      await storage.updateSession(sessionId, { status: "ready", videoUrl: null });
     } catch (err) {
       console.error("ANALYSIS ERROR:", err);
 
-      await supabaseAdmin.storage.from("Videos").remove([videoPath]).catch(() => undefined);
+      await removeStoredVideo(videoPath, "failed analysis").catch(() => undefined);
       await storage.updateSession(sessionId, {
         status: "error",
+        videoUrl: null,
         errorMessage: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -1726,13 +1734,19 @@ await storage.updateSession(sessionId, { status: "ready" });
       } catch (err: any) {
         await storage.updateChallengeSubmission(submission.id, {
           status: "error",
+          videoUrl: null,
           feedback: err?.message || "Challenge analysis failed",
         } as any);
       } finally {
-        // Keep challenge video in Supabase for playback/history/debugging.
-        if (tempFile) {
+        await removeStoredVideo(videoPath, "challenge").catch(() => undefined);
+        await storage.updateChallengeSubmission(submission.id, {
+          videoUrl: null,
+        } as any).catch(() => undefined);
+
+        for (const p of Array.from(new Set([tempFile, tempOriginal]))) {
+          if (!p) continue;
           try {
-            fs.unlinkSync(tempFile);
+            fs.unlinkSync(p);
           } catch {}
         }
       }
