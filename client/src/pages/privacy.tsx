@@ -101,8 +101,14 @@ export default function PrivacyPage() {
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">8. Account Deletion</h2>
         <p>
-          Users may request deletion of their account and associated data through
-          the Settings page or by contacting support.
+          Users may delete their account and associated app data from the
+          Settings page. This removes athlete profiles, analyses, session
+          history, badges, challenge submissions, and competition activity from
+          GymGlow systems.
+        </p>
+        <p>
+          Billing records may remain with payment processors where required for
+          legal, tax, fraud prevention, or payment compliance reasons.
         </p>
       </section>
 

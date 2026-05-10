@@ -7,6 +7,7 @@ Last updated: 2026-05-07
 - App/server use Supabase Postgres for the database. Render hosts the deployed app/server.
 - Uploaded videos are treated as temporary processing files. Successful and failed analyses/challenge submissions remove the Supabase Storage video object and keep only results/metadata.
 - Old Supabase Storage videos were manually deleted from the `Videos` bucket after DB references were cleared.
+- Settings now includes an account deletion flow. `DELETE /api/users/me` requires Supabase bearer auth and the confirmation phrase `DELETE MY ACCOUNT`, removes user-owned app data, attempts to cancel active Stripe subscription, removes any remaining user video storage objects, and deletes the Supabase Auth user.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
@@ -62,10 +63,10 @@ After first badge earning logic pass:
 
 ## Recommended Next Steps
 
-1. Add user-facing account deletion and session/result deletion controls.
-2. Rerun `script/supabase-video-storage-audit.sql` to confirm `storage_video_objects` is 0.
+1. Test account deletion with a disposable/demo user in Supabase before relying on it for real users.
+2. Add session/result deletion controls for users who want to remove individual analysis history without deleting the whole account.
 3. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
-4. Do an App Store readiness pass for privacy, child safety, account deletion, AI disclosure, and subscriptions.
+4. Do an App Store readiness pass for child safety, AI disclosure, and subscriptions.
 
 ## Important Reminder
 

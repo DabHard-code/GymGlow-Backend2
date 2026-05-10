@@ -135,6 +135,40 @@ async function removeStoredVideo(videoPath: string, label: string): Promise<void
   }
 }
 
+async function removeStoredVideosForUser(userId: string): Promise<number> {
+  const bucket = supabaseAdmin.storage.from("Videos");
+  const paths: string[] = [];
+
+  async function collect(prefix: string): Promise<void> {
+    const { data, error } = await bucket.list(prefix, { limit: 1000 });
+    if (error) {
+      console.warn(`Could not list video storage prefix ${prefix}:`, error.message);
+      return;
+    }
+
+    for (const item of data || []) {
+      const itemPath = `${prefix}/${item.name}`;
+      if ((item as any).metadata) {
+        paths.push(itemPath);
+      } else {
+        await collect(itemPath);
+      }
+    }
+  }
+
+  await collect(userId);
+
+  for (let i = 0; i < paths.length; i += 100) {
+    const batch = paths.slice(i, i + 100);
+    const { error } = await bucket.remove(batch);
+    if (error) {
+      console.warn("Could not remove account video storage batch:", error.message);
+    }
+  }
+
+  return paths.length;
+}
+
 
 /* ==================== DRILL MATCHING HELPERS ==================== */
 
@@ -468,6 +502,54 @@ app.post("/api/uploads/video/backend", backendVideoUpload.single("video"), async
       subscriptionStatus: (user as any).subscriptionStatus ?? "inactive",
       currentPeriodEnd: (user as any).currentPeriodEnd ?? null,
     });
+  });
+
+  app.delete("/api/users/me", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const parsed = z.object({
+      confirmation: z.string(),
+    }).safeParse(req.body ?? {});
+
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    if (parsed.data.confirmation !== "DELETE MY ACCOUNT") {
+      return res.status(400).json({
+        error: "Type DELETE MY ACCOUNT to confirm account deletion.",
+      });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => undefined);
+      return res.json({ success: true, deleted: { users: 0 } });
+    }
+
+    if (user.stripeSubscriptionId && user.subscriptionStatus !== "canceled") {
+      await getStripe()
+        .subscriptions.cancel(user.stripeSubscriptionId)
+        .catch((err) => console.warn("Could not cancel Stripe subscription during account deletion:", err));
+    }
+
+    const storageObjectsDeleted = await removeStoredVideosForUser(userId).catch((err) => {
+      console.warn("Could not clean user video storage during account deletion:", err);
+      return 0;
+    });
+
+    const deleted = await storage.deleteUserAccountData(userId);
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (authDeleteError) {
+      console.warn("Supabase auth user deletion failed after DB deletion:", authDeleteError.message);
+      return res.status(500).json({
+        error: "Account data was deleted, but auth deletion needs support follow-up.",
+        deleted,
+        storageObjectsDeleted,
+      });
+    }
+
+    res.json({ success: true, deleted, storageObjectsDeleted });
   });
 
   // Disabled: plans must be changed by Stripe/webhook, not by client request.

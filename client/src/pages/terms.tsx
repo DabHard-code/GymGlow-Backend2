@@ -125,6 +125,11 @@ export default function TermsPage() {
           We reserve the right to suspend or terminate accounts that violate
           these terms or misuse the Platform.
         </p>
+        <p>
+          You may delete your account from the Settings page. Account deletion
+          removes your app data from GymGlow, while billing records may remain
+          with payment processors where legally or operationally required.
+        </p>
       </section>
 
       <section className="space-y-4">

@@ -89,6 +89,21 @@ export interface IStorage {
 
   consumeTrialCredit(userId: string): Promise<User>;
   tryConsumeTrialCredit(userId: string): Promise<boolean>;
+  deleteUserAccountData(userId: string): Promise<{
+    users: number;
+    athletes: number;
+    profiles: number;
+    sessions: number;
+    analyses: number;
+    earnedBadges: number;
+    badgeProgress: number;
+    skillProgress: number;
+    challengeSubmissions: number;
+    competitionPoints: number;
+    seasons: number;
+    meets: number;
+    meetScores: number;
+  }>;
 
   // ===== ATHLETE METHODS =====
   getAthletesByUser(userId: string): Promise<Athlete[]>;
@@ -343,6 +358,164 @@ export class DatabaseStorage implements IStorage {
       .returning({ id: users.id });
 
     return Boolean(user);
+  }
+
+  async deleteUserAccountData(userId: string): Promise<{
+    users: number;
+    athletes: number;
+    profiles: number;
+    sessions: number;
+    analyses: number;
+    earnedBadges: number;
+    badgeProgress: number;
+    skillProgress: number;
+    challengeSubmissions: number;
+    competitionPoints: number;
+    seasons: number;
+    meets: number;
+    meetScores: number;
+  }> {
+    return db.transaction(async (tx) => {
+      const userAthletes = await tx
+        .select({ id: athletes.id })
+        .from(athletes)
+        .where(eq(athletes.userId, userId));
+      const athleteIds = userAthletes.map((row) => row.id);
+
+      const userProfiles = athleteIds.length
+        ? await tx
+            .select({ id: sportProfiles.id })
+            .from(sportProfiles)
+            .where(inArray(sportProfiles.athleteId, athleteIds))
+        : [];
+      const profileIds = userProfiles.map((row) => row.id);
+
+      const userSessions = profileIds.length
+        ? await tx
+            .select({ id: sessions.id })
+            .from(sessions)
+            .where(inArray(sessions.profileId, profileIds))
+        : [];
+      const sessionIds = userSessions.map((row) => row.id);
+
+      const userAnalyses = sessionIds.length
+        ? await tx
+            .select({ id: analyses.id })
+            .from(analyses)
+            .where(inArray(analyses.sessionId, sessionIds))
+        : [];
+      const analysisIds = userAnalyses.map((row) => row.id);
+
+      const userSeasons = athleteIds.length
+        ? await tx
+            .select({ id: seasons.id })
+            .from(seasons)
+            .where(inArray(seasons.athleteId, athleteIds))
+        : [];
+      const seasonIds = userSeasons.map((row) => row.id);
+
+      const userMeets = seasonIds.length
+        ? await tx
+            .select({ id: meets.id })
+            .from(meets)
+            .where(inArray(meets.seasonId, seasonIds))
+        : [];
+      const meetIds = userMeets.map((row) => row.id);
+
+      const counts = {
+        users: 0,
+        athletes: 0,
+        profiles: 0,
+        sessions: 0,
+        analyses: 0,
+        earnedBadges: 0,
+        badgeProgress: 0,
+        skillProgress: 0,
+        challengeSubmissions: 0,
+        competitionPoints: 0,
+        seasons: 0,
+        meets: 0,
+        meetScores: 0,
+      };
+
+      if (meetIds.length) {
+        counts.meetScores = (
+          await tx.delete(meetScores).where(inArray(meetScores.meetId, meetIds)).returning({ id: meetScores.id })
+        ).length;
+      }
+
+      if (seasonIds.length) {
+        counts.meets = (
+          await tx.delete(meets).where(inArray(meets.seasonId, seasonIds)).returning({ id: meets.id })
+        ).length;
+      }
+
+      if (athleteIds.length) {
+        counts.seasons = (
+          await tx.delete(seasons).where(inArray(seasons.athleteId, athleteIds)).returning({ id: seasons.id })
+        ).length;
+        counts.badgeProgress = (
+          await tx.delete(badgeProgress).where(inArray(badgeProgress.athleteId, athleteIds)).returning({ id: badgeProgress.id })
+        ).length;
+        counts.skillProgress = (
+          await tx.delete(skillProgress).where(inArray(skillProgress.athleteId, athleteIds)).returning({ id: skillProgress.id })
+        ).length;
+      }
+
+      if (analysisIds.length) {
+        counts.earnedBadges = (
+          await tx.delete(earnedBadges).where(inArray(earnedBadges.analysisId, analysisIds)).returning({ id: earnedBadges.id })
+        ).length;
+      } else if (athleteIds.length) {
+        counts.earnedBadges = (
+          await tx.delete(earnedBadges).where(inArray(earnedBadges.athleteId, athleteIds)).returning({ id: earnedBadges.id })
+        ).length;
+      }
+
+      if (sessionIds.length) {
+        counts.challengeSubmissions = (
+          await tx.delete(challengeSubmissions).where(inArray(challengeSubmissions.sessionId, sessionIds)).returning({ id: challengeSubmissions.id })
+        ).length;
+        if (analysisIds.length) {
+          counts.analyses = (
+            await tx.delete(analyses).where(inArray(analyses.id, analysisIds)).returning({ id: analyses.id })
+          ).length;
+        }
+      }
+
+      if (profileIds.length) {
+        counts.challengeSubmissions += (
+          await tx.delete(challengeSubmissions).where(inArray(challengeSubmissions.profileId, profileIds)).returning({ id: challengeSubmissions.id })
+        ).length;
+        counts.competitionPoints = (
+          await tx.delete(competitionPoints).where(inArray(competitionPoints.profileId, profileIds)).returning({ id: competitionPoints.id })
+        ).length;
+        counts.sessions = (
+          await tx.delete(sessions).where(inArray(sessions.profileId, profileIds)).returning({ id: sessions.id })
+        ).length;
+        counts.profiles = (
+          await tx.delete(sportProfiles).where(inArray(sportProfiles.id, profileIds)).returning({ id: sportProfiles.id })
+        ).length;
+      }
+
+      if (athleteIds.length) {
+        counts.challengeSubmissions += (
+          await tx.delete(challengeSubmissions).where(inArray(challengeSubmissions.athleteId, athleteIds)).returning({ id: challengeSubmissions.id })
+        ).length;
+        counts.competitionPoints += (
+          await tx.delete(competitionPoints).where(inArray(competitionPoints.athleteId, athleteIds)).returning({ id: competitionPoints.id })
+        ).length;
+        counts.athletes = (
+          await tx.delete(athletes).where(inArray(athletes.id, athleteIds)).returning({ id: athletes.id })
+        ).length;
+      }
+
+      counts.users = (
+        await tx.delete(users).where(eq(users.id, userId)).returning({ id: users.id })
+      ).length;
+
+      return counts;
+    });
   }
 
 

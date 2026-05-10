@@ -12,6 +12,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -76,10 +87,38 @@ export default function SettingsPage() {
 });
 
   // ---------- Account ----------
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+
   const logout = async () => {
     await supabase.auth.signOut();
     setLocation("/auth");
   };
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/users/me", {
+        confirmation: deleteConfirmation,
+      });
+      return res.json();
+    },
+    onSuccess: async () => {
+      queryClient.clear();
+      await supabase.auth.signOut();
+      toast({
+        title: "Account deleted",
+        description: "Your GymGlow account and app data have been deleted.",
+      });
+      setLocation("/auth");
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Account deletion failed",
+        description: String(err?.message ?? err),
+        variant: "destructive",
+      });
+    },
+  });
 
   // ---------- Athlete editing ----------
   const [editOpen, setEditOpen] = useState(false);
@@ -201,8 +240,70 @@ export default function SettingsPage() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Log out
               </Button>
-              {/* later: delete account */}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Account
+            </CardTitle>
+            <CardDescription>
+              Permanently delete your GymGlow account, athlete profiles, results, badges, and app activity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Uploaded videos are already temporary and are not retained after processing. This action removes your saved account data and cannot be undone.
+            </p>
+
+            <AlertDialog open={deleteAccountOpen} onOpenChange={(open) => {
+              setDeleteAccountOpen(open);
+              if (!open) setDeleteConfirmation("");
+            }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" data-testid="button-delete-account">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete your GymGlow account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes your athlete profiles, analyses, session history, badges, challenge submissions, and competition points. Active billing is cancelled when possible, but payment records may remain with the payment processor where required by law.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delete-confirmation">Type DELETE MY ACCOUNT to confirm</Label>
+                  <Input
+                    id="delete-confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => setDeleteConfirmation(event.target.value)}
+                    autoComplete="off"
+                    data-testid="input-delete-account-confirmation"
+                  />
+                </div>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleteAccountMutation.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={deleteConfirmation !== "DELETE MY ACCOUNT" || deleteAccountMutation.isPending}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      deleteAccountMutation.mutate();
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="button-confirm-delete-account"
+                  >
+                    Delete account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
 
