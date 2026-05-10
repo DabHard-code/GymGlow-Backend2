@@ -1,6 +1,6 @@
 # GymGlow Handoff
 
-Last updated: 2026-05-07
+Last updated: 2026-05-10
 
 ## Current State
 
@@ -8,12 +8,13 @@ Last updated: 2026-05-07
 - Uploaded videos are treated as temporary processing files. Successful and failed analyses/challenge submissions remove the Supabase Storage video object and keep only results/metadata.
 - Old Supabase Storage videos were manually deleted from the `Videos` bucket after DB references were cleared.
 - Settings now includes an account deletion flow. `DELETE /api/users/me` requires Supabase bearer auth and the confirmation phrase `DELETE MY ACCOUNT`, removes user-owned app data, attempts to cancel active Stripe subscription, removes any remaining user video storage objects, and deletes the Supabase Auth user.
+- Profile pages now include individual analysis/result deletion. `DELETE /api/analyses/:id` requires ownership, removes the analysis row, tied earned badges, analysis-sourced competition points, any leftover stored video path, and the parent session when it no longer has analyses.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check and production build passed after the repair work.
+- Type check and production build passed after the repair work and result deletion pass.
 
 ## Latest Supabase Audit
 
@@ -63,10 +64,9 @@ After first badge earning logic pass:
 
 ## Recommended Next Steps
 
-1. Test account deletion with a disposable/demo user in Supabase before relying on it for real users.
-2. Add session/result deletion controls for users who want to remove individual analysis history without deleting the whole account.
-3. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
-4. Do an App Store readiness pass for child safety, AI disclosure, and subscriptions.
+1. Test individual result deletion with a disposable user that has earned badges/competition points, then confirm the result disappears from the profile.
+2. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
+3. Do an App Store readiness pass for child safety, AI disclosure, and subscriptions.
 
 ## Important Reminder
 

@@ -1315,6 +1315,20 @@ app.get("/billing/portal", async (req, res) => {
     res.json(access.analysis);
   });
 
+  app.delete("/api/analyses/:id", async (req, res) => {
+    const access = await requireAnalysisAccess(req, res, req.params.id);
+    if (!access) return;
+
+    if (access.session.videoUrl) {
+      await removeStoredVideo(access.session.videoUrl, "deleted analysis").catch((err) => {
+        console.warn("Failed to remove video for deleted analysis:", err);
+      });
+    }
+
+    const deleted = await storage.deleteAnalysisResult(req.params.id);
+    res.json({ success: deleted.analyses > 0, deleted });
+  });
+
   /* ==================== BADGES ==================== */
 
   // DB-backed badge catalog (new system). Co-exists with legacy earned_badges.badge_type.

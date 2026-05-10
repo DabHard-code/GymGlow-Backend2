@@ -139,6 +139,12 @@ export interface IStorage {
   getRecentAnalysesByProfile(profileId: string, limit?: number): Promise<Analysis[]>;
   getAnalysis(id: string): Promise<Analysis | undefined>;
   createAnalysis(analysis: InsertAnalysis): Promise<Analysis>;
+  deleteAnalysisResult(analysisId: string): Promise<{
+    analyses: number;
+    earnedBadges: number;
+    competitionPoints: number;
+    sessions: number;
+  }>;
 
   // ===== BADGE METHODS =====
   getBadgesByAthlete(athleteId: string): Promise<EarnedBadge[]>;
@@ -664,6 +670,64 @@ export class DatabaseStorage implements IStorage {
   async createAnalysis(insertAnalysis: InsertAnalysis): Promise<Analysis> {
     const [analysis] = await db.insert(analyses).values(insertAnalysis as any).returning();
     return analysis;
+  }
+
+  async deleteAnalysisResult(analysisId: string): Promise<{
+    analyses: number;
+    earnedBadges: number;
+    competitionPoints: number;
+    sessions: number;
+  }> {
+    return db.transaction(async (tx) => {
+      const [analysis] = await tx.select().from(analyses).where(eq(analyses.id, analysisId)).limit(1);
+      if (!analysis) {
+        return { analyses: 0, earnedBadges: 0, competitionPoints: 0, sessions: 0 };
+      }
+
+      const counts = {
+        analyses: 0,
+        earnedBadges: 0,
+        competitionPoints: 0,
+        sessions: 0,
+      };
+
+      counts.earnedBadges = (
+        await tx
+          .delete(earnedBadges)
+          .where(eq(earnedBadges.analysisId, analysisId))
+          .returning({ id: earnedBadges.id })
+      ).length;
+
+      counts.competitionPoints = (
+        await tx
+          .delete(competitionPoints)
+          .where(and(eq(competitionPoints.sourceType, "analysis"), eq(competitionPoints.sourceId, analysisId)))
+          .returning({ id: competitionPoints.id })
+      ).length;
+
+      counts.analyses = (
+        await tx.delete(analyses).where(eq(analyses.id, analysisId)).returning({ id: analyses.id })
+      ).length;
+
+      const remainingAnalyses = await tx
+        .select({ id: analyses.id })
+        .from(analyses)
+        .where(eq(analyses.sessionId, analysis.sessionId))
+        .limit(1);
+
+      if (remainingAnalyses.length === 0) {
+        await tx
+          .update(challengeSubmissions)
+          .set({ sessionId: null } as any)
+          .where(eq(challengeSubmissions.sessionId, analysis.sessionId));
+
+        counts.sessions = (
+          await tx.delete(sessions).where(eq(sessions.id, analysis.sessionId)).returning({ id: sessions.id })
+        ).length;
+      }
+
+      return counts;
+    });
   }
 
   // ===== BADGE METHODS =====

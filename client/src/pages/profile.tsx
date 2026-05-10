@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useParams, Link } from "wouter";
 import {
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Heart,
   Eye,
   Megaphone,
+  Trash2,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,9 +21,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { VideoUploadZone } from "@/components/video-upload-zone";
 import { AnalysisView } from "@/components/analysis-view";
 import { FeedbackPanel } from "@/components/feedback-panel";
+import { useToast } from "@/hooks/use-toast";
 
 import {
   type SportProfile,
@@ -56,9 +69,13 @@ function getTimeAgo(date: Date): string {
 function AnalysisCard({
   analysis,
   onView,
+  onDelete,
+  isDeleting,
 }: {
   analysis: Analysis;
   onView: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
 }) {
   const date = analysis.createdAt ? new Date(analysis.createdAt) : new Date();
   const timeAgo = getTimeAgo(date);
@@ -91,9 +108,43 @@ function AnalysisCard({
             </div>
           )}
 
-          <Button variant="outline" size="sm" onClick={onView}>
-            View
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onView}>
+              View
+            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  disabled={isDeleting}
+                  aria-label="Delete analysis"
+                  data-testid={`button-delete-analysis-${analysis.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this result?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This removes the analysis result and related awards from your account.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={onDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -115,6 +166,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export default function ProfilePage() {
   const params = useParams<{ id?: string; profileId?: string }>();
+  const { toast } = useToast();
 
   // supports either /profiles/:id or /profiles/:profileId
   const profileId = params.id || params.profileId || "";
@@ -171,6 +223,32 @@ export default function ProfilePage() {
   const handleBack = () => {
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideoFile(null);
+  };
+
+  const deleteAnalysisMutation = useMutation({
+    mutationFn: async (analysisId: string) => {
+      const res = await apiRequest("DELETE", `/api/analyses/${analysisId}`);
+      return res.json();
+    },
+    onSuccess: async () => {
+      setViewingAnalysis(null);
+      await queryClient.invalidateQueries({ queryKey: ["analyses", profileId] });
+      toast({
+        title: "Result deleted",
+        description: "That analysis has been removed from your profile.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteAnalysis = (analysisId: string) => {
+    deleteAnalysisMutation.mutate(analysisId);
   };
 
   // --- HARD FAILS THAT EXPLAIN THE ISSUE ---
@@ -268,7 +346,40 @@ export default function ProfilePage() {
               </div>
               <span className="font-display font-bold text-xl">Analysis Details</span>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={deleteAnalysisMutation.isPending}
+                    aria-label="Delete analysis"
+                    data-testid={`button-delete-analysis-detail-${viewingAnalysis.id}`}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this result?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This removes the analysis result and related awards from your account.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteAnalysis(viewingAnalysis.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
@@ -361,6 +472,8 @@ export default function ProfilePage() {
                     key={analysis.id}
                     analysis={analysis}
                     onView={() => setViewingAnalysis(analysis)}
+                    onDelete={() => handleDeleteAnalysis(analysis.id)}
+                    isDeleting={deleteAnalysisMutation.isPending}
                   />
                 ))}
               </div>
