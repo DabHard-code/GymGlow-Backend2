@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, LogOut, Plus, Save, Settings, Trash2, UserRound } from "lucide-react";
@@ -32,6 +32,7 @@ import { type Athlete, type SportProfile, sportTypes, gymnasticsLevels, type Spo
 type MeResponse = {
   id: string;
   username: string;
+  displayName: string;
   plan: "none" | "coach" | "competition";
   trialCredits: number;
   subscriptionStatus: string;
@@ -89,6 +90,7 @@ export default function SettingsPage() {
   // ---------- Account ----------
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [accountName, setAccountName] = useState("");
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -114,6 +116,26 @@ export default function SettingsPage() {
     onError: (err: any) => {
       toast({
         title: "Account deletion failed",
+        description: String(err?.message ?? err),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", "/api/users/me", {
+        displayName: accountName.trim(),
+      });
+      return res.json() as Promise<MeResponse>;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      toast({ title: "Saved", description: "Account name updated." });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Save failed",
         description: String(err?.message ?? err),
         variant: "destructive",
       });
@@ -192,6 +214,12 @@ export default function SettingsPage() {
     setEditOpen(true);
   };
 
+  const displayAccountName = me?.displayName || "GymGlow Parent";
+
+  useEffect(() => {
+    if (me?.displayName) setAccountName(me.displayName);
+  }, [me?.displayName]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="h-16 border-b sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -222,10 +250,47 @@ export default function SettingsPage() {
               <UserRound className="h-5 w-5" />
               Account
             </CardTitle>
-            <CardDescription>Your login + account actions.</CardDescription>
+            <CardDescription>Your parent or coach account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="account-display-name">Display name</Label>
+                <Input
+                  id="account-display-name"
+                  value={accountName}
+                  onChange={(event) => setAccountName(event.target.value)}
+                  placeholder="GymGlow Parent"
+                  maxLength={48}
+                  data-testid="input-account-display-name"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used inside your account only. Athlete names and leaderboard names are managed separately.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                disabled={updateAccountMutation.isPending || !accountName.trim()}
+                onClick={() => updateAccountMutation.mutate()}
+                data-testid="button-save-account-display-name"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <div className="font-medium">{displayAccountName}</div>
+              <div className="text-muted-foreground">Account ID available for support if needed.</div>
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-muted-foreground">Support details</summary>
+                <div className="mt-2 break-all text-xs text-muted-foreground">
+                  {me?.id ?? "Unavailable"}
+                </div>
+              </details>
+            </div>
+
+            <div className="hidden">
               <div>
                 <Label>Username</Label>
                 <div className="mt-1 text-sm">{me?.username ?? "—"}</div>

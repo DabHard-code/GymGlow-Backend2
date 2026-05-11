@@ -15,6 +15,7 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
+  displayName: text("display_name"),
   password: text("password").notNull(),
   plan: text("plan").notNull().default("none").$type<"none" | "coach" | "competition">(),
   trialCredits: integer("trial_credits").notNull().default(1),

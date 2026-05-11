@@ -59,6 +59,15 @@ function sanitizePublicAlias(input: string): string {
     .trim();
 }
 
+function sanitizeDisplayName(input: string): string {
+  return input
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-zA-Z0-9 #.'-]/g, "")
+    .slice(0, 48)
+    .trim();
+}
+
 
 function sanitizeUploadFileName(fileName: string | null | undefined): string {
   const raw = String(fileName || "upload.mp4");
@@ -534,6 +543,37 @@ app.post("/api/uploads/video/backend", backendVideoUpload.single("video"), async
     res.json({
       id: user.id,
       username: user.username,
+      displayName: user.displayName || "GymGlow Parent",
+      plan: user.plan,
+      trialCredits: user.trialCredits,
+      subscriptionStatus: (user as any).subscriptionStatus ?? "inactive",
+      currentPeriodEnd: (user as any).currentPeriodEnd ?? null,
+    });
+  });
+
+  app.patch("/api/users/me", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    await storage.ensureUserFromAuth(userId);
+
+    const parsed = z.object({
+      displayName: z.string().min(1).max(80),
+    }).safeParse(req.body ?? {});
+
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const displayName = sanitizeDisplayName(parsed.data.displayName);
+    if (displayName.length < 2) {
+      return res.status(400).json({ error: "Display name must be at least 2 characters." });
+    }
+
+    const user = await storage.updateUserProfile(userId, { displayName });
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || "GymGlow Parent",
       plan: user.plan,
       trialCredits: user.trialCredits,
       subscriptionStatus: (user as any).subscriptionStatus ?? "inactive",

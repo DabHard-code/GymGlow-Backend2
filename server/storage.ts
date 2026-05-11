@@ -89,6 +89,7 @@ export interface IStorage {
       currentPeriodEnd?: Date | null;
     },
   ): Promise<User>;
+  updateUserProfile(userId: string, updates: { displayName?: string | null }): Promise<User>;
 
   consumeTrialCredit(userId: string): Promise<User>;
   tryConsumeTrialCredit(userId: string): Promise<boolean>;
@@ -307,6 +308,7 @@ export class DatabaseStorage implements IStorage {
       .values({
         id: authUserId,
         username: authUserId,
+        displayName: "GymGlow Parent",
         password: "",
       } as InsertUser)
       .returning();
@@ -350,6 +352,20 @@ export class DatabaseStorage implements IStorage {
     if (!user) throw new Error("User not found");
     return user;
   }
+
+  async updateUserProfile(userId: string, updates: { displayName?: string | null }): Promise<User> {
+    const setObj: any = {};
+    if (typeof updates.displayName !== "undefined") setObj.displayName = updates.displayName;
+
+    const [user] = await db
+      .update(users)
+      .set(setObj)
+      .where(eq(users.id, userId))
+      .returning();
+    if (!user) throw new Error("User not found");
+    return user;
+  }
+
   async consumeTrialCredit(userId: string): Promise<User> {
     const [user] = await db
       .update(users)
