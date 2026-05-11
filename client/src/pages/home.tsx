@@ -511,16 +511,22 @@ function AddAthleteCard() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add New Athlete</DialogTitle>
+          <DialogDescription>
+            Athlete names are private to your account. Public leaderboards use a safe alias that you can edit in Settings.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label>Private athlete name</Label>
             <Input 
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter athlete name"
+              placeholder="First name or nickname"
               data-testid="input-athlete-name"
             />
+            <p className="text-xs text-muted-foreground">
+              This name is not shown on public rankings.
+            </p>
           </div>
           <Button 
             onClick={handleAdd} 

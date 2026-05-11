@@ -673,6 +673,23 @@ export default function ChallengesPage() {
       </header>
 
       <main className="container px-4 py-6">
+        <Card className="mb-6">
+          <CardContent className="flex items-start gap-3 py-4">
+            <div className="rounded-md bg-primary/10 p-2">
+              <Trophy className="h-5 w-5 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-semibold">Weekly challenges, private by design</h2>
+              <p className="text-sm text-muted-foreground">
+                Submit the week's skill, earn points, and climb leaderboards using your athlete's safe public alias. Videos are processed temporarily and deleted after analysis.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                AI scoring is practice feedback, not official judging or medical advice.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="mb-6">
           <Tabs value={selectedSport} onValueChange={(v) => setSelectedSport(v as "all" | SportType)}>
             <TabsList className="w-full max-w-lg">

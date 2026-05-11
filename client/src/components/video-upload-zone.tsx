@@ -95,7 +95,7 @@ export function VideoUploadZone({ onVideoSelect, disabled, compact }: VideoUploa
     [selectFile],
   );
 
-  const helperText = "MP4, MOV, WebM, M4V, HEVC, or QT up to 500 MB. Large videos are sent to GymGlow first, optimized, then stored safely.";
+  const helperText = "MP4, MOV, WebM, M4V, HEVC, or QT up to 500 MB. Videos are processed temporarily and deleted after analysis.";
 
   const content = compact ? (
     <>
@@ -132,19 +132,19 @@ export function VideoUploadZone({ onVideoSelect, disabled, compact }: VideoUploa
         {isDragging ? "Drop your video here" : "Upload Your Video"}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        Upload your routine, drill, swing, or dance video. GymGlow will optimize large mobile videos before storage and AI analysis.
+        Upload your routine, drill, swing, or dance video. GymGlow will optimize large mobile videos before AI analysis.
       </p>
       <Button type="button" className="mt-4" disabled={disabled}>
         Browse Files
       </Button>
       <p className="mt-3 text-xs text-muted-foreground">{helperText}</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        If preview looks black, upload can still work after backend optimization.
+        AI feedback is coaching support, not official judging, medical advice, or safety clearance.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-        <div>Large Video Support</div>
-        <div>4K Optimization</div>
-        <div>Form Correction</div>
+        <div>Temporary Processing</div>
+        <div>Safe Feedback</div>
+        <div>Drill Suggestions</div>
         <div>Progress Tracking</div>
       </div>
     </>

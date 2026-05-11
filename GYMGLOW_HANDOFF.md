@@ -15,12 +15,13 @@ Last updated: 2026-05-10
 - Weekly challenges now use a rotating 12-template gymnastics catalog instead of always showing the same handstand/cartwheel/landing trio. The active endpoint prioritizes the current week's rotated three while preserving existing challenge/submission history.
 - AI analysis prompts were tightened for youth-safe, specific coaching. Feedback now requires observable notes, a reason it matters, a clear correction cue, drill/repetition suggestions, conservative scoring when unclear, and stricter challenge eligibility checks.
 - Added `users.display_name`, `PATCH /api/users/me`, and a cleaner Settings account card. Raw account IDs are tucked under support details instead of shown as the primary account identity.
+- Added first-run trust polish: onboarding now explains private names, public aliases, temporary video processing, and AI-feedback limits; athlete creation explains private names; uploads and challenges show short video retention and safety disclaimers.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, and account display-name pass.
+- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, account display-name pass, and first-run trust polish pass.
 
 ## Latest Supabase Audit
 

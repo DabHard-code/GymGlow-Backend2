@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, UserPlus, Video, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Sparkles, UserPlus, Video, ChevronLeft, ChevronRight, X, Shield } from "lucide-react";
 
 const ONBOARDING_KEY = "gymglow_onboarding_complete";
 
@@ -16,20 +16,26 @@ const steps: OnboardingStep[] = [
   {
     icon: Sparkles,
     title: "Welcome to GymGlow!",
-    description: "Your AI-powered coach for perfecting athletic form. Track multiple athletes across gymnastics, dance, cheer, weightlifting, and yoga.",
+    description: "Upload a skill video and get clear coaching feedback, progress tracking, and weekly challenges built for youth athletes.",
     color: "text-primary",
   },
   {
     icon: UserPlus,
-    title: "Create Athlete Profiles",
-    description: "Add athletes and set up their sport profiles. Each athlete can train in multiple sports with personalized skill tracking.",
+    title: "Private Names, Safe Rankings",
+    description: "Athlete names stay inside your account. Public leaderboards use safe display aliases that you can edit anytime.",
     color: "text-green-500",
   },
   {
     icon: Video,
-    title: "Upload & Get Feedback",
-    description: "Record a skill, upload the video, and receive instant AI coaching. Track progress with badges and compete in weekly challenges!",
+    title: "Temporary Video Processing",
+    description: "Videos are used for analysis and deleted after processing. GymGlow keeps the feedback, scores, badges, and progress history.",
     color: "text-blue-500",
+  },
+  {
+    icon: Shield,
+    title: "Coaching Support, Not Official Judging",
+    description: "AI feedback is a practice tool. It is not medical advice, safety clearance, or an official competition score.",
+    color: "text-amber-500",
   },
 ];
 
