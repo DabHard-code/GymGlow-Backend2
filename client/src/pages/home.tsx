@@ -263,7 +263,7 @@ function AthleteCard({ athlete }: { athlete: Athlete }) {
         <Link href={`/competition-results/${athlete.id}`}>
           <Button variant="outline" size="sm" className="w-full" data-testid={`button-competition-results-${athlete.id}`}>
             <Trophy className="h-4 w-4 mr-2" />
-            End of Week Results
+            Comp Calendar & Results
           </Button>
         </Link>
 

@@ -17,12 +17,13 @@ Last updated: 2026-05-10
 - Added `users.display_name`, `PATCH /api/users/me`, and a cleaner Settings account card. Raw account IDs are tucked under support details instead of shown as the primary account identity.
 - Added first-run trust polish: onboarding now explains private names, public aliases, temporary video processing, and AI-feedback limits; athlete creation explains private names; uploads and challenges show short video retention and safety disclaimers.
 - Added Comp Week visibility. Profile-aware callouts now show when Comp Week is live or coming soon on athlete cards, profile upload pages, and the badge page. Crimson badge locked text now explains whether badges are available during the current Comp Week or locked until the next one.
+- Added a Comp Week calendar to the competition results screen. It shows the current profile's 6-week cycle, highlights the current week, and marks weeks 3 and 6 as Comp Weeks. The home button now reads "Comp Calendar & Results."
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, account display-name pass, first-run trust polish pass, and Comp Week visibility pass.
+- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, account display-name pass, first-run trust polish pass, Comp Week visibility pass, and Comp Week calendar pass.
 
 ## Latest Supabase Audit
 

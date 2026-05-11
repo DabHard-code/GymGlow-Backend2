@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { CompWeekCalendar } from "@/components/comp-week-calendar";
 
 import { type SportProfile, type SportType, sportDisplayNames } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -96,10 +97,10 @@ export default function CompetitionResultsPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Trophy className="h-6 w-6" /> End of Week Results
+              <Trophy className="h-6 w-6" /> Comp Calendar & Results
             </h1>
             <p className="text-sm text-muted-foreground">
-              Results show for the last completed week (Sun–Sat). Best 2 uploads count.
+              Plan around the 6-week cycle. Results show for the last completed week. Best 2 uploads count.
             </p>
           </div>
         </div>
@@ -153,6 +154,8 @@ export default function CompetitionResultsPage() {
           </CardContent>
         </Card>
       )}
+
+      <CompWeekCalendar profileId={profileId} />
 
       {!profileId ? (
         <Card>
