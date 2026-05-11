@@ -35,6 +35,7 @@ import {
 import { VideoUploadZone } from "@/components/video-upload-zone";
 import { AnalysisView } from "@/components/analysis-view";
 import { FeedbackPanel } from "@/components/feedback-panel";
+import { CompWeekCallout } from "@/components/comp-week-callout";
 import { useToast } from "@/hooks/use-toast";
 
 import {
@@ -487,7 +488,8 @@ export default function ProfilePage() {
                 Upload New Video
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <CompWeekCallout profileId={profileId} />
               <VideoUploadZone onVideoSelect={handleVideoSelect} compact />
             </CardContent>
           </Card>

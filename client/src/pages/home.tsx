@@ -20,6 +20,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AthleteBadgeCollection, BadgeShowcase } from "@/components/badge-display";
 import { OnboardingCarousel, useOnboarding } from "@/components/onboarding";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { CompWeekCallout } from "@/components/comp-week-callout";
 import WelcomeChallengeCard from "@/components/welcome-challenge";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -42,6 +43,7 @@ function AthleteCard({ athlete }: { athlete: Athlete }) {
   const { data: profiles = [] } = useQuery<SportProfile[]>({
     queryKey: ["/api/athletes", athlete.id, "profiles"],
   });
+  const primaryProfileId = profiles[0]?.id;
 
   const [isAddingProfile, setIsAddingProfile] = useState(false);
   const [newSport, setNewSport] = useState<SportType>("gymnastics");
@@ -247,6 +249,8 @@ function AthleteCard({ athlete }: { athlete: Athlete }) {
           <div className="flex-1" />
           <BadgeShowcase athleteId={athlete.id} athleteName={athlete.name} />
         </div>
+
+        <CompWeekCallout profileId={primaryProfileId} compact showWhenInactive={false} />
 
 
         <Link href={`/meet-scores/${athlete.id}`}>

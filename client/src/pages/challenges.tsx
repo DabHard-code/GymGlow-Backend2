@@ -684,7 +684,7 @@ export default function ChallengesPage() {
                 Submit the week's skill, earn points, and climb leaderboards using your athlete's safe public alias. Videos are processed temporarily and deleted after analysis.
               </p>
               <p className="text-xs text-muted-foreground">
-                AI scoring is practice feedback, not official judging or medical advice.
+                During a profile's Comp Week, eligible submissions can also count toward Crimson badges. AI scoring is practice feedback, not official judging or medical advice.
               </p>
             </div>
           </CardContent>

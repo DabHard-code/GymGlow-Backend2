@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BadgeIconDb } from "@/components/badge-icon-db";
 import { BadgeRow } from "@/components/badge-display";
+import { CompWeekCallout } from "@/components/comp-week-callout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -305,6 +306,8 @@ const isBadgeEarned = (badge: DbBadge) =>
               {!isCompWeek && <> Current week is not a Competition Week.</>}
             </div>
 
+            <CompWeekCallout profileId={profileId} />
+
            {tierOrder.map((tier) => {
   const earnedCount = grouped[tier].filter((b) => isBadgeEarned(b)).length;
 
@@ -340,6 +343,10 @@ const isBadgeEarned = (badge: DbBadge) =>
                   <p className="text-xs mt-2">
                     {earned ? (
                       <span className="text-primary font-medium">Earned</span>
+                    ) : badge.tier === "crimson" ? (
+                      <span className="text-muted-foreground">
+                        {isCompWeek ? "Available during this Comp Week" : "Locked until Comp Week"}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">Locked</span>
                     )}

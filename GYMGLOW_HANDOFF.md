@@ -16,12 +16,13 @@ Last updated: 2026-05-10
 - AI analysis prompts were tightened for youth-safe, specific coaching. Feedback now requires observable notes, a reason it matters, a clear correction cue, drill/repetition suggestions, conservative scoring when unclear, and stricter challenge eligibility checks.
 - Added `users.display_name`, `PATCH /api/users/me`, and a cleaner Settings account card. Raw account IDs are tucked under support details instead of shown as the primary account identity.
 - Added first-run trust polish: onboarding now explains private names, public aliases, temporary video processing, and AI-feedback limits; athlete creation explains private names; uploads and challenges show short video retention and safety disclaimers.
+- Added Comp Week visibility. Profile-aware callouts now show when Comp Week is live or coming soon on athlete cards, profile upload pages, and the badge page. Crimson badge locked text now explains whether badges are available during the current Comp Week or locked until the next one.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, account display-name pass, and first-run trust polish pass.
+- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, AI feedback quality pass, account display-name pass, first-run trust polish pass, and Comp Week visibility pass.
 
 ## Latest Supabase Audit
 
@@ -76,8 +77,9 @@ After first badge earning logic pass:
 3. Confirm `/api/challenges?active=true` returns the current rotated three challenges and that old submissions remain visible on their original challenge rows.
 4. Test a normal upload and one intentionally wrong challenge upload to confirm feedback is specific and ineligible submissions are rejected kindly.
 5. After deploying, edit Settings -> Account display name and verify it persists after reload.
-6. In app store consoles, set Privacy Policy URL to `/privacy` and Google Play data deletion URL to `/privacy-choices`.
-7. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
+6. Test a profile in weeks 1, 2, 3, and 6 of its competition cycle to confirm the Comp Week callout copy is clear for inactive, upcoming, and live states.
+7. In app store consoles, set Privacy Policy URL to `/privacy` and Google Play data deletion URL to `/privacy-choices`.
+8. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
 
 ## Important Reminder
 
