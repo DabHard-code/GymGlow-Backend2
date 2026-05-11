@@ -73,10 +73,12 @@ function buildSportPrompt(
 
   return [
     `You are an ${roleBySport[sport]} coaching a youth athlete.`,
-    "Your tone is uplifting, specific, and actionable.",
-    "Never shame; use encouraging language.",
-    "If the video is too short/unclear, say so in the summary and keep recommendations conservative.",
-    "Safety: avoid dangerous advice; include safetyNotes when appropriate (spotter, matting, progression).",
+    "Your tone is warm, precise, age-appropriate, and actionable.",
+    "Never shame; avoid harsh labels like bad, wrong, lazy, weak, or dangerous.",
+    "Do not claim medical, injury, or safety clearance. Do not diagnose pain or injuries.",
+    "Only describe what can reasonably be inferred from the sampled frames. If visibility is limited, say so and lower certainty.",
+    "If the video is too short/unclear, say so in the summary, keep scoring conservative, and focus on safe basics.",
+    "Safety: avoid advanced skill advice unless the frames clearly show readiness; include safetyNotes when matting, spotting, space, or progression limits matter.",
     "",
     ...(ctx?.targetSkillName
       ? [
@@ -85,7 +87,7 @@ function buildSportPrompt(
           ctx.description ? `Skill description: ${ctx.description}` : "",
           ctx.keyPoints?.length ? `Key coaching points: ${ctx.keyPoints.join("; ")}` : "",
           rubricBlock ? `Skill rubric (use this to judge phases/checkpoints):\n${rubricBlock}` : "",
-          "If the frames do not show a clear attempt of the required skill, set overallScore low and say it is not a valid attempt of the required skill in summary.",
+          "If the frames do not show a clear attempt of the required skill, set overallScore between 0 and 35 and say it is not a valid attempt of the required skill in summary.",
         ].filter(Boolean)
       : []),
     "Return ONLY a valid JSON object that matches this schema exactly:",
@@ -95,13 +97,13 @@ function buildSportPrompt(
     '  "technicalBreakdown": string (short paragraph; can be empty string),',
     '  "strengths": string[] (3-6 short positives),',
     '  "feedback": Array< {',
-    '     "title": string,',
-    '     "description": string,',
-    '     "improvement": string (clear next step),',
+    '     "title": string (short coaching focus, not generic),',
+    '     "description": string (what you observed + why it matters, 1-2 sentences),',
+    '     "improvement": string (one exact correction cue the athlete can try next time),',
     '     "severity": "info"|"warning"|"critical",',
     '     "bodyPart"?: string,',
     '     "phase"?: string,',
-    '     "drillRecommendation"?: string',
+    '     "drillRecommendation"?: string (specific drill + reps/hold time when possible)',
     "  } > (3-8 items; DO NOT return an empty array),",
     '  "safetyNotes": string[] (0-3 items),',
     '  "progressionTips": string[] (0-4 items),',
@@ -111,7 +113,12 @@ function buildSportPrompt(
     "Hard requirements:",
     "- feedback must have at least 3 items.",
     "- Each feedback item must include title, description, improvement, severity.",
+    "- At least one feedback item must address a strength, and at least two must address corrections.",
+    "- Each correction must include a body/shape cue such as arms by ears, ribs down, squeeze legs, eyes forward, or knees over toes when relevant.",
+    "- technicalBreakdown must mention phases/checkpoints visible in the frames, not generic praise.",
+    "- strengths should be specific observable positives, not generic good job filler.",
     "- Keep feedback concrete and tied to what you can infer from the frames.",
+    "- Use critical only for clear safety concerns or clearly invalid attempts.",
     "- No markdown. No extra keys.",
   ].join("\n");
 }
@@ -303,6 +310,13 @@ const parsed = JSON.parse(content);
       return s === "critical" || s === "warning" || s === "info" ? s : "info";
     };
 
+    const cleanText = (value: unknown, fallback = "", maxLength = 420): string => {
+      const text = String(value ?? fallback)
+        .replace(/\s+/g, " ")
+        .trim();
+      return text.length > maxLength ? `${text.slice(0, maxLength - 1).trim()}…` : text;
+    };
+
     const rawFeedback = Array.isArray(parsed.feedback) ? parsed.feedback : [];
 
     // Guardrail: the UI needs feedback cards. If the model returns an empty array,
@@ -341,13 +355,13 @@ const parsed = JSON.parse(content);
 
     const feedback: FeedbackItem[] = feedbackSource.map((f: any) => ({
       id: randomUUID(),
-      title: f.title || "Issue",
-      description: f.description || "",
-      improvement: f.improvement || "",
+      title: cleanText(f.title, "Coaching focus", 80),
+      description: cleanText(f.description, "Focus on clean shape, control, and safe progressions.", 360),
+      improvement: cleanText(f.improvement, "Try one controlled repetition with a clear start, tight body shape, and still finish.", 260),
       severity: normalizeSeverity(f.severity),
-      bodyPart: f.bodyPart,
-      drillRecommendation: f.drillRecommendation,
-      phase: f.phase,
+      bodyPart: cleanText(f.bodyPart, "", 40) || undefined,
+      drillRecommendation: cleanText(f.drillRecommendation, "", 220) || undefined,
+      phase: cleanText(f.phase, "", 40) || undefined,
     }));
 
     const validBadges = (parsed.awardedBadges || []).filter(
@@ -356,15 +370,19 @@ const parsed = JSON.parse(content);
 
     return {
       overallScore: Math.max(0, Math.min(100, parsed.overallScore ?? 70)),
-      summary: parsed.summary ?? "Analysis complete.",
-      technicalBreakdown: parsed.technicalBreakdown ?? "",
+      summary: cleanText(parsed.summary, "Analysis complete.", 260),
+      technicalBreakdown: cleanText(parsed.technicalBreakdown, "", 900),
       feedback,
       strengths:
         Array.isArray(parsed.strengths) && parsed.strengths.length
-          ? parsed.strengths.slice(0, 8)
+          ? parsed.strengths.map((s: unknown) => cleanText(s, "", 120)).filter(Boolean).slice(0, 8)
           : ["Good effort and confidence", "Nice commitment to the movement", "Strong intention on the finish"],
-      safetyNotes: Array.isArray(parsed.safetyNotes) ? parsed.safetyNotes.slice(0, 5) : [],
-      progressionTips: Array.isArray(parsed.progressionTips) ? parsed.progressionTips.slice(0, 6) : [],
+      safetyNotes: Array.isArray(parsed.safetyNotes)
+        ? parsed.safetyNotes.map((s: unknown) => cleanText(s, "", 180)).filter(Boolean).slice(0, 5)
+        : [],
+      progressionTips: Array.isArray(parsed.progressionTips)
+        ? parsed.progressionTips.map((s: unknown) => cleanText(s, "", 180)).filter(Boolean).slice(0, 6)
+        : [],
       awardedBadges: validBadges,
     };
   } finally {
@@ -436,33 +454,26 @@ export async function analyzeChallengeVideoFilePath(
     });
 
     const baseSystem =
-      `You are a youth-coaching assistant for ${sport}. ` +
-      `You will evaluate a weekly challenge submission.\n\n` +
-      `IMPORTANT: First identify what skill is actually shown. ` +
-      `Do NOT assume the challenge skill was performed.\n\n` +
-      `Challenge skill to match: "${targetName}".\n` +
+      `You are a careful youth ${sport} challenge judge. ` +
+      `Your first job is eligibility, not encouragement.\n\n` +
+      `IMPORTANT: First identify what skill is actually shown from the frames. ` +
+      `Do NOT assume the challenge skill was performed because of the title. ` +
+      `If the camera angle or frames are unclear, lower confidence and be conservative.\n\n` +
+      `Challenge skill to match exactly enough for eligibility: "${targetName}".\n` +
       (targetDesc ? `Skill description: ${targetDesc}\n` : "") +
       (instructions ? `Challenge instructions: ${instructions}\n` : "") +
       `\nSkill rubric (use this to judge phases/checkpoints):\n${challengeRubricBlock}\n\n` +
       `Return JSON ONLY with this schema:\n` +
       `{"isMatch": boolean, "detectedSkill": string, "detectedSkillCandidates": string[], "confidence": number, "score": number|null, "feedback": string}\n\n` +
       `Rules:\n` +
-      `- Step A (Eligibility): Set detectedSkill + confidence (0..1). Decide isMatch vs the challenge skill.\n` +
+      `- Step A (Eligibility): Set detectedSkill + confidence (0..1). Decide isMatch vs the challenge skill using visible checkpoints.\n` +
       `- Provide detectedSkillCandidates (array of up to 2 strings) with your top 2 specific guesses.\n` +
-      `- If isMatch=false: score MUST be null. Feedback must politely explain it's not eligible and tell what was detected.\n` +
-      `- If isMatch=true: give a 0..100 score and short, specific, kid-friendly coaching feedback.\n` +
+      `- Set isMatch=false if the required skill is absent, only partially visible, too unclear to judge, or a different skill category.\n` +
+      `- If isMatch=false: score MUST be null. Feedback must politely explain it is not eligible, name what was detected, and say what to upload instead.\n` +
+      `- If isMatch=true: give a 0..100 score and short, specific, kid-friendly coaching feedback with one clear correction cue.\n` +
       `- Never praise the challenge skill if it was not performed.\n` +
+      `- Do not give medical advice or safety clearance.\n` +
       `- Keep detectedSkill under 60 characters, candidates under 60 chars each, and feedback under 300 characters.`;
-
-    // ...leave the rest of your function as-is starting from callModel(...)
-      const rubricBlock = buildSkillRubricBlock({
-  sport,
-  skillName: targetName,
-  category: null,
-  description: targetDesc || null,
-  keyPoints: null,
-  commonMistakes: null,
-});
 
     const callModel = async (modelName: string, maxTokens: number) => {
   return await openai.chat.completions.create({

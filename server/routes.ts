@@ -1714,19 +1714,92 @@ app.get("/billing/portal", async (req, res) => {
   }
 }
 
+  const weeklyChallengeTemplates = [
+    { name: "Scale Balance Challenge", description: "Hold a clean scale shape with steady hips and calm control.", instructions: "Upload a scale hold. Keep your supporting leg strong, chest lifted, and finish without hopping.", targetSkillId: "skill_scale", difficulty: "beginner" },
+    { name: "Stick the Landing Challenge", description: "Quiet, controlled landing with no extra steps.", instructions: "Upload a straight jump with a stick. Land softly with knees over toes, chest up, and no steps.", targetSkillId: "skill_straight_jump", difficulty: "beginner" },
+    { name: "Hollow Hold Challenge", description: "Show a tight hollow body shape with ribs tucked and legs squeezed.", instructions: "Upload a hollow hold. Keep lower back pressed down, arms by ears if possible, and legs tight.", targetSkillId: "skill_hollow_hold", difficulty: "beginner" },
+    { name: "Cartwheel Lines Challenge", description: "Clean lines and control through a cartwheel.", instructions: "Upload your best cartwheel. Focus on straight arms, body alignment, and a strong lunge finish.", targetSkillId: "skill_cartwheel", difficulty: "beginner" },
+    { name: "Split Jump Shape Challenge", description: "Show clear split shape in the air and land under control.", instructions: "Upload a split jump. Focus on pointed toes, lifted chest, and a controlled landing.", targetSkillId: "skill_split_jump", difficulty: "intermediate" },
+    { name: "Cast Shape Challenge", description: "Show tight body tension and shoulder control on a cast.", instructions: "Upload a cast or cast drill. Focus on straight arms, tight core, and a clean return to support.", targetSkillId: "skill_cast", difficulty: "intermediate" },
+    { name: "Handstand Hold Challenge", description: "Show control and alignment in a handstand hold.", instructions: "Upload your best handstand hold. Aim for straight arms, tight legs, and a steady finish.", targetSkillId: "skill_handstand", difficulty: "beginner" },
+    { name: "Beam Walk Control Challenge", description: "Show calm posture and steady feet on a beam-style walk.", instructions: "Upload a beam walk or floor-line beam drill. Keep eyes forward, arms controlled, and steps quiet.", targetSkillId: "skill_mount", difficulty: "beginner" },
+    { name: "Round-off Rebound Challenge", description: "Show a fast snap-down and tall rebound after a round-off.", instructions: "Upload a round-off rebound. Focus on straight arms, quick feet together, and a tall finish.", targetSkillId: "skill_roundoff_bhs_prep", difficulty: "intermediate" },
+    { name: "Leap Control Challenge", description: "Show height, shape, and a clean landing in a leap.", instructions: "Upload a leap or chasse-leap connection. Focus on pointed toes, lifted posture, and controlled landing.", targetSkillId: "skill_split_leap", difficulty: "intermediate" },
+    { name: "Vault Hurdle Challenge", description: "Show a strong hurdle with rhythm, posture, and arm drive.", instructions: "Upload a vault hurdle or board-entry drill. Focus on quick feet, arms up, and a safe controlled finish.", targetSkillId: "skill_hurdle", difficulty: "beginner" },
+    { name: "Bridge Shape Challenge", description: "Show shoulder openness and steady body control in a bridge.", instructions: "Upload a bridge hold or bridge kickover prep. Keep arms straight, feet grounded, and move safely.", targetSkillId: "skill_bridge", difficulty: "beginner" },
+  ] as const;
+
+  function getWeeklyChallengeSet(weekStart: Date) {
+    const rotations = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [9, 10, 11],
+    ];
+    const weekIndex = Math.floor(weekStart.getTime() / (7 * 24 * 60 * 60 * 1000));
+    return rotations[weekIndex % rotations.length].map((index) => weeklyChallengeTemplates[index]);
+  }
+
+  async function ensureRotatingWeeklyChallengesExist(): Promise<void> {
+    const { weekStart } = getWeekWindowSunday(new Date());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const sport = "gymnastics";
+    const existing = await storage.getChallengesBySport(sport);
+    const activeThisWeek = existing.filter((c: any) => {
+      const start = c.startDate ? new Date(c.startDate) : null;
+      const end = c.endDate ? new Date(c.endDate) : null;
+      return Boolean(start && end && start.getTime() === weekStart.getTime() && end.getTime() === weekEnd.getTime());
+    });
+
+    for (const t of getWeeklyChallengeSet(weekStart)) {
+      const alreadyExists = activeThisWeek.some((c: any) => c.targetSkillId === t.targetSkillId || c.name === t.name);
+      if (alreadyExists) continue;
+
+      await storage.createChallenge({
+        name: t.name,
+        description: t.description,
+        instructions: t.instructions,
+        targetSkillId: t.targetSkillId,
+        sport,
+        difficulty: t.difficulty,
+        startDate: weekStart,
+        endDate: weekEnd,
+        isActive: true,
+      } as any);
+    }
+  }
+
   app.get("/api/challenges", async (req, res) => {
     const active = String(req.query.active || "").toLowerCase() === "true";
     await ensureWeeklyChallengesExist();
+    await ensureRotatingWeeklyChallengesExist();
 
     if (active) {
       const all = await storage.getActiveChallenges();
+      const { weekStart } = getWeekWindowSunday(new Date());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      const selectedTargets = getWeeklyChallengeSet(weekStart).map((c) => c.targetSkillId);
+      const selectedOrder = new Map<string, number>(selectedTargets.map((targetSkillId, index) => [targetSkillId, index]));
       const seen = new Set<string>();
       const gym = all.filter((c) => {
         if (c.sport !== "gymnastics") return false;
+        const start = c.startDate ? new Date(c.startDate) : null;
+        const end = c.endDate ? new Date(c.endDate) : null;
+        if (!start || !end) return false;
+        if (start.getTime() !== weekStart.getTime() || end.getTime() !== weekEnd.getTime()) return false;
         const key = c.targetSkillId || c.name;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
+      }).sort((a, b) => {
+        const aOrder = selectedOrder.get(a.targetSkillId || "") ?? 999;
+        const bOrder = selectedOrder.get(b.targetSkillId || "") ?? 999;
+        return aOrder - bOrder;
       }).slice(0, 3);
       return res.json(gym);
     }

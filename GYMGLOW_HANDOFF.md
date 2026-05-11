@@ -12,12 +12,14 @@ Last updated: 2026-05-10
 - Added public `/privacy-choices` page for account/data deletion instructions outside the logged-in app. Use this as the Google Play data deletion URL and optionally Apple privacy choices URL.
 - Added persisted in-app support/safety reporting. The Feedback dialog posts to `POST /api/support-reports` and stores reports in the new `support_reports` table.
 - Added safe public leaderboard aliases with `athletes.public_display_name`. Private athlete names remain inside the user's account; leaderboard/result endpoints return public aliases and `isViewer` instead of exposing athlete IDs.
+- Weekly challenges now use a rotating 12-template gymnastics catalog instead of always showing the same handstand/cartwheel/landing trio. The active endpoint prioritizes the current week's rotated three while preserving existing challenge/submission history.
+- AI analysis prompts were tightened for youth-safe, specific coaching. Feedback now requires observable notes, a reason it matters, a clear correction cue, drill/repetition suggestions, conservative scoring when unclear, and stricter challenge eligibility checks.
 - Auth was hardened from trusting `x-user-id` to requiring a Supabase bearer token.
 - Duplicate Supabase client usage was fixed on the frontend.
 - Badge catalog sync and legacy `earned_badges` to `badge_progress` backfill were added.
 - Drill-to-skill seeding was added.
 - Active challenge responses are deduped before returning to the client.
-- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, and public leaderboard alias pass.
+- Type check, `db:push`, and production build passed after the repair work, result deletion pass, privacy choices pass, support-report pass, public leaderboard alias pass, weekly challenge rotation pass, and AI feedback quality pass.
 
 ## Latest Supabase Audit
 
@@ -69,8 +71,10 @@ After first badge earning logic pass:
 
 1. Test individual result deletion with a disposable user that has earned badges/competition points, then confirm the result disappears from the profile.
 2. After deploying, test Settings -> edit athlete -> public leaderboard name, then confirm leaderboard rows show the alias and not a private athlete name.
-3. In app store consoles, set Privacy Policy URL to `/privacy` and Google Play data deletion URL to `/privacy-choices`.
-4. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
+3. Confirm `/api/challenges?active=true` returns the current rotated three challenges and that old submissions remain visible on their original challenge rows.
+4. Test a normal upload and one intentionally wrong challenge upload to confirm feedback is specific and ineligible submissions are rejected kindly.
+5. In app store consoles, set Privacy Policy URL to `/privacy` and Google Play data deletion URL to `/privacy-choices`.
+6. Implement the remaining badge earning rules for criteria such as `score_threshold`, `drills_logged`, `cues_used`, and `improvement` after storing stronger structured evidence.
 
 ## Important Reminder
 
