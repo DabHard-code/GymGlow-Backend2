@@ -91,7 +91,7 @@ export function CompWeekCalendar({ profileId }: { profileId?: string | null }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Each sport profile runs on a 6-week cycle. Weeks 3 and 6 are Comp Weeks, when eligible uploads and challenge submissions can earn Crimson badges.
+          GymGlow uses one shared 6-week calendar for every athlete and sport profile. Weeks 3 and 6 are Comp Weeks, when eligible uploads and challenge submissions can earn Crimson badges.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

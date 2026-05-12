@@ -2203,6 +2203,25 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
     return { weekStart, weekEnd };
   }
 
+  const DEFAULT_COMP_CYCLE_START = "2026-05-10";
+
+  function parseLocalDate(raw: string) {
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+    return new Date(raw);
+  }
+
+  function getCompetitionCycleStart() {
+    const raw = process.env.GYMGLOW_COMP_CYCLE_START || DEFAULT_COMP_CYCLE_START;
+    const parsed = parseLocalDate(raw);
+    const safeDate = Number.isNaN(parsed.getTime())
+      ? parseLocalDate(DEFAULT_COMP_CYCLE_START)
+      : parsed;
+    return getWeekWindowSundayFor(safeDate).weekStart;
+  }
+
   function buildCoachRecap(opts: {
     isCompWeek: boolean;
     cycleWeek: number;
@@ -2233,9 +2252,8 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
   }
 
 
-  function getCycleWeek(profileCreatedAt: Date, weekStart: Date) {
-    const start = new Date(profileCreatedAt);
-    start.setHours(0, 0, 0, 0);
+  function getCycleWeek(weekStart: Date) {
+    const start = getCompetitionCycleStart();
     const target = new Date(weekStart);
     target.setHours(0, 0, 0, 0);
     const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -2251,19 +2269,15 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
 
     const access = await requireProfileAccess(req, res, profileId);
     if (!access) return;
-    const { profile } = access;
 
     const now = new Date();
     const { weekStart, weekEnd } = getWeekWindowSundayFor(now);
 
-    const profileCreatedAt = (profile.createdAt instanceof Date)
-      ? profile.createdAt
-      : new Date(profile.createdAt as any);
-
-    const cycleWeek = getCycleWeek(profileCreatedAt, weekStart);
+    const cycleWeek = getCycleWeek(weekStart);
     const isCompWeek = cycleWeek === 3 || cycleWeek === 6;
 
     res.json({
+      cycleStart: getCompetitionCycleStart(),
       weekStart,
       weekEnd,
       weekInCycle: cycleWeek,
@@ -2292,11 +2306,7 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
     const { weekStart, weekEnd } = getWeekWindowSundayFor(lastWeekStart);
 
-    const profileCreatedAt = (profile.createdAt instanceof Date)
-      ? profile.createdAt
-      : new Date(profile.createdAt as any);
-
-    const cycleWeek = getCycleWeek(profileCreatedAt, weekStart);
+    const cycleWeek = getCycleWeek(weekStart);
     const isCompWeek = cycleWeek === 3 || cycleWeek === 6;
 
     // If it wasn't a comp week, still return a friendly response (so UI can show "Training week")
@@ -2304,6 +2314,7 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
       return res.json({
         weekStart,
         weekEnd,
+        cycleStart: getCompetitionCycleStart(),
         cycleWeek,
         isCompWeek: false,
         message: "Training week — results show after Comp Week.",
@@ -2393,6 +2404,7 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
     });
 
 res.json({
+      cycleStart: getCompetitionCycleStart(),
       weekStart,
       weekEnd,
       cycleWeek,

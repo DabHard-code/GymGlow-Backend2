@@ -100,7 +100,7 @@ export default function CompetitionResultsPage() {
               <Trophy className="h-6 w-6" /> Comp Calendar & Results
             </h1>
             <p className="text-sm text-muted-foreground">
-              Plan around the 6-week cycle. Results show for the last completed week. Best 2 uploads count.
+              Plan around GymGlow's shared 6-week cycle. Results show for the last completed week. Best 2 uploads count.
             </p>
           </div>
         </div>
