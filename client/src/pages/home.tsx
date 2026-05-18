@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
 import {
-  Plus, Zap, User, Sparkles, Music, Trophy, Heart, Trash2, Pencil,
+  Plus, User, Sparkles, Music, Trophy, Heart, Trash2, Pencil,
   Award, BookOpen, Star, ListChecks, MessageSquare, Medal, Settings
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -560,9 +560,7 @@ export default function Home() {
       <header className="h-16 border-b flex-shrink-0 sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="h-full max-w-screen-2xl mx-auto px-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/gymglow-logo.png" alt="GymGlow logo" className="h-11 w-14 rounded-md object-cover" />
             <span className="font-display font-bold text-xl" data-testid="text-brand">
               GymGlow
             </span>

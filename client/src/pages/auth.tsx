@@ -49,6 +49,11 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 px-4">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <img
+          src="/gymglow-logo.png"
+          alt="GymGlow logo"
+          className="mx-auto mb-4 h-28 w-auto object-contain"
+        />
         <h1 className="text-2xl font-bold mb-2 text-center">GymGlow</h1>
         <p className="text-sm text-slate-400 mb-6 text-center">
           {mode === "login"

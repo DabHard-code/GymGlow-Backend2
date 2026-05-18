@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "GymGlow",
+    "slug": "gymglow-native",
+    "scheme": "gymglow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gymglow.app"
+    },
+    "android": {
+      "package": "com.gymglow.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "apiBaseUrl": "https://gymglow-backend.onrender.com",
+      "supabaseUrl": "https://ozvlzuzhzkyhpzgktpep.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96dmx6dXpoemt5aHB6Z2t0cGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTE5OTMsImV4cCI6MjA4Mzk4Nzk5M30.AyoD7mCdRxwR_nCG1Ej3Xrq4giZ3CVwsPLTYBeK5U60"
+    }
+  }
+}

@@ -4,7 +4,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useParams, Link } from "wouter";
 import {
   ArrowLeft,
-  Zap,
   Upload,
   Clock,
   Sparkles,
@@ -409,9 +408,7 @@ export default function ProfilePage() {
               </Button>
             </Link>
 
-            <div className="p-2 rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/gymglow-logo.png" alt="GymGlow logo" className="h-11 w-14 rounded-md object-cover" />
 
             <span className="font-display font-bold text-xl" data-testid="text-brand">
               GymGlow
