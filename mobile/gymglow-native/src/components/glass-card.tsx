@@ -17,13 +17,18 @@ export function GlassCard({ children, style, ...props }: Props) {
 
 const styles = StyleSheet.create({
   outer: {
-    borderRadius: 24,
+    borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
   },
   inner: {
-    padding: 18,
+    padding: 20,
   },
 });

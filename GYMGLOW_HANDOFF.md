@@ -6,6 +6,7 @@ Last updated: 2026-05-10
 
 - App/server use Supabase Postgres for the database. Render hosts the deployed app/server.
 - Native mobile work now lives in `mobile/gymglow-native`. This Expo Router app was imported from the first-pass native prototype and its API layer was updated to use Supabase bearer tokens instead of legacy `x-user-id` headers so it matches the hardened backend.
+- Native mobile visual polish pass started: shared theme colors, glass cards, gradient primary buttons, home hero, athlete rows, upload screen, and settings screen were redesigned to feel closer to a real GymGlow mobile app.
 - Uploaded videos are treated as temporary processing files. Successful and failed analyses/challenge submissions remove the Supabase Storage video object and keep only results/metadata.
 - Old Supabase Storage videos were manually deleted from the `Videos` bucket after DB references were cleared.
 - Settings now includes an account deletion flow. `DELETE /api/users/me` requires Supabase bearer auth and the confirmation phrase `DELETE MY ACCOUNT`, removes user-owned app data, attempts to cancel active Stripe subscription, removes any remaining user video storage objects, and deletes the Supabase Auth user.

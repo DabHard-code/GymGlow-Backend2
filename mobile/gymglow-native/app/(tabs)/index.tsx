@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/screen';
 import { GlassCard } from '@/components/glass-card';
@@ -42,11 +42,14 @@ export default function HomeTab() {
 
   return (
     <Screen>
-      <Text style={styles.eyebrow}>GYMGLOW</Text>
-      <Text style={styles.title}>Hi {me?.username ?? 'Coach'}, let’s keep the next rep clear and useful.</Text>
-      <Text style={styles.subtitle}>Manage athletes, upload skills, and review progress from one mobile workspace.</Text>
+      <GlassCard style={styles.heroCard}>
+        <Image source={require('../../assets/gymglow-logo.png')} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.eyebrow}>GYMGLOW</Text>
+        <Text style={styles.title}>Hi {me?.username ?? 'Coach'}, ready for a cleaner next rep?</Text>
+        <Text style={styles.subtitle}>Private athlete profiles, AI practice feedback, and progress tracking in one place.</Text>
+      </GlassCard>
 
-      <GlassCard style={{ marginTop: 20 }}>
+      <GlassCard style={styles.statsCard}>
         <View style={styles.heroRow}>
           <View style={styles.heroStat}>
             <Text style={styles.statValue}>{athletes.length}</Text>
@@ -63,7 +66,7 @@ export default function HomeTab() {
         </View>
       </GlassCard>
 
-      <GlassCard style={{ marginTop: 16 }}>
+      <GlassCard style={styles.actionsCard}>
         <Text style={styles.quickTitle}>Quick actions</Text>
         <View style={styles.quickActions}>
           <View style={{ flex: 1 }}>
@@ -75,7 +78,7 @@ export default function HomeTab() {
         </View>
       </GlassCard>
 
-      <SectionTitle title="Your roster" subtitle="Tap any athlete to see profiles and analysis history." />
+      <SectionTitle title="Your roster" subtitle="Tap an athlete to manage profiles and review recent analysis." />
       {athletes.map((athlete) => (
         <AthleteRow key={athlete.id} athlete={athlete} profiles={profilesByAthlete[athlete.id]} />
       ))}
@@ -91,15 +94,26 @@ export default function HomeTab() {
 
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  eyebrow: { color: colors.secondary, fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
-  title: { color: colors.text, fontSize: 30, fontWeight: '900', lineHeight: 36, marginTop: 8 },
-  subtitle: { color: colors.textMuted, marginTop: 10, lineHeight: 22 },
-  quickTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 14 },
+  heroCard: { marginTop: 2 },
+  logo: { width: 190, height: 96, alignSelf: 'center', marginBottom: 6 },
+  eyebrow: { color: colors.secondary, fontSize: 12, fontWeight: '900', letterSpacing: 1.2, textAlign: 'center' },
+  title: { color: colors.text, fontSize: 29, fontWeight: '900', lineHeight: 35, marginTop: 8, textAlign: 'center' },
+  subtitle: { color: colors.textMuted, marginTop: 10, lineHeight: 22, textAlign: 'center' },
+  statsCard: { marginTop: 16 },
+  actionsCard: { marginTop: 16 },
+  quickTitle: { color: colors.text, fontSize: 18, fontWeight: '900', marginBottom: 14 },
   quickActions: { flexDirection: 'row', gap: 12 },
   heroRow: { flexDirection: 'row', gap: 12 },
-  heroStat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 18, padding: 14 },
+  heroStat: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   statValue: { color: colors.text, fontSize: 22, fontWeight: '900' },
-  statLabel: { color: colors.textMuted, marginTop: 4, textTransform: 'capitalize' },
-  emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: 6 },
+  statLabel: { color: colors.textMuted, marginTop: 4, textTransform: 'capitalize', fontSize: 12 },
+  emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '900', marginBottom: 6 },
   emptyCopy: { color: colors.textMuted, lineHeight: 20 },
 });

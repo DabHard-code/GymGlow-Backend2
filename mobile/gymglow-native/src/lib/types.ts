@@ -4,6 +4,7 @@ export type Athlete = {
   id: string;
   userId: string;
   name: string;
+  publicDisplayName?: string | null;
   avatarUrl?: string | null;
   createdAt?: string | null;
 };
