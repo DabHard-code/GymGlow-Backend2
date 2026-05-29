@@ -1064,9 +1064,28 @@ app.get("/billing/portal", async (req, res) => {
   });
 
   app.post("/api/profiles", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const parsed = createProfileSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const athlete = await storage.getAthlete(parsed.data.athleteId);
+    if (!athlete || athlete.userId !== userId) {
+      return res.status(404).json({ error: "Athlete not found" });
+    }
+
     res.status(201).json(await storage.createProfile(parsed.data));
+  });
+
+  app.delete("/api/profiles/:profileId", async (req, res) => {
+    const access = await requireProfileAccess(req, res, req.params.profileId);
+    if (!access) return;
+
+    const deleted = await storage.deleteProfile(req.params.profileId);
+    if (!deleted) return res.status(404).json({ error: "Profile not found" });
+
+    res.json({ success: true });
   });
 
 

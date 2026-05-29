@@ -631,13 +631,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProfile(id: string): Promise<boolean> {
-    const profileSessions = await this.getSessionsByProfile(id);
-    for (const session of profileSessions) {
-      await db.delete(analyses).where(eq(analyses.sessionId, session.id));
-    }
-    await db.delete(sessions).where(eq(sessions.profileId, id));
-    const deleted = await db.delete(sportProfiles).where(eq(sportProfiles.id, id)).returning();
-    return deleted.length > 0;
+    return db.transaction(async (tx) => {
+      const profileSessions = await tx
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(eq(sessions.profileId, id));
+      const sessionIds = profileSessions.map((session) => session.id);
+
+      const profileAnalyses = sessionIds.length
+        ? await tx
+            .select({ id: analyses.id })
+            .from(analyses)
+            .where(inArray(analyses.sessionId, sessionIds))
+        : [];
+      const analysisIds = profileAnalyses.map((analysis) => analysis.id);
+
+      if (analysisIds.length) {
+        await tx.delete(earnedBadges).where(inArray(earnedBadges.analysisId, analysisIds));
+      }
+
+      if (sessionIds.length) {
+        await tx.update(challengeSubmissions).set({ sessionId: null } as any).where(inArray(challengeSubmissions.sessionId, sessionIds));
+        await tx.delete(analyses).where(inArray(analyses.sessionId, sessionIds));
+      }
+
+      await tx.delete(challengeSubmissions).where(eq(challengeSubmissions.profileId, id));
+      await tx.delete(competitionPoints).where(eq(competitionPoints.profileId, id));
+      await tx.delete(sessions).where(eq(sessions.profileId, id));
+
+      const deleted = await tx.delete(sportProfiles).where(eq(sportProfiles.id, id)).returning();
+      return deleted.length > 0;
+    });
   }
 
   // ===== SESSION / ANALYSIS METHODS =====
