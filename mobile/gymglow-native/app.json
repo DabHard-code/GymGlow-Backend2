@@ -5,6 +5,7 @@
     "scheme": "gymglow",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": ["**/*"],
     "plugins": ["expo-router"],
