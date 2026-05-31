@@ -781,6 +781,59 @@ app.get("/billing/portal", async (req, res) => {
     res.json({ url: session.url });
   });
 
+  app.post("/api/billing/revenuecat-sync", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const revenueCatSecretKey = process.env.REVENUECAT_SECRET_KEY;
+    if (!revenueCatSecretKey) {
+      return res.status(501).json({ error: "RevenueCat server API key is not configured." });
+    }
+
+    await storage.ensureUserFromAuth(userId);
+
+    const revenueCatResponse = await fetch(
+      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${revenueCatSecretKey}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (!revenueCatResponse.ok) {
+      return res.status(502).json({ error: "Could not verify the Apple subscription with RevenueCat." });
+    }
+
+    const revenueCatData = (await revenueCatResponse.json()) as {
+      subscriber?: {
+        entitlements?: Record<string, { expires_date?: string | null }>;
+      };
+    };
+
+    const entitlements = revenueCatData.subscriber?.entitlements ?? {};
+    const hasActiveEntitlement = (name: PaidPlan) => {
+      const entitlement = entitlements[name];
+      if (!entitlement) return false;
+      if (!entitlement.expires_date) return true;
+      return new Date(entitlement.expires_date).getTime() > Date.now();
+    };
+
+    const plan: "none" | PaidPlan = hasActiveEntitlement("competition")
+      ? "competition"
+      : hasActiveEntitlement("coach")
+        ? "coach"
+        : "none";
+
+    const user = await storage.updateUserBilling(userId, {
+      plan,
+      subscriptionStatus: plan === "none" ? "inactive" : "active",
+    });
+
+    res.json({ plan: user.plan, subscriptionStatus: user.subscriptionStatus });
+  });
+
   // Stripe webhook: set user plan based on subscription status.
   app.post("/api/billing/webhook", async (req, res) => {
     const stripeSignature = req.header("stripe-signature");
@@ -1394,18 +1447,20 @@ app.get("/billing/portal", async (req, res) => {
         progressionTips: result.progressionTips || null,
       });
 
-      await storage.awardCompetitionPoints({
-        athleteId,
-        profileId,
-        sourceType: "analysis",
-        sourceId: analysis.id,
-        points: 10,
-        reason: "analysis_upload",
-        metadata: {
-          score: result.overallScore,
-          sessionId,
-        },
-      }).catch(() => undefined);
+      if (user.plan === "competition") {
+        await storage.awardCompetitionPoints({
+          athleteId,
+          profileId,
+          sourceType: "analysis",
+          sourceId: analysis.id,
+          points: 10,
+          reason: "analysis_upload",
+          metadata: {
+            score: result.overallScore,
+            sessionId,
+          },
+        }).catch(() => undefined);
+      }
 
       if (!isTrial && result.awardedBadges?.length) {
         await storage.awardBadges(
@@ -1879,7 +1934,7 @@ app.get("/billing/portal", async (req, res) => {
   });
 
   app.post("/api/challenges/:id/submit", async (req, res) => {
-    const auth = await requirePlan(req, res, ["coach", "competition"]);
+    const auth = await requirePlan(req, res, ["competition"]);
     if (!auth) return;
 
     const challenge = await storage.getChallenge(req.params.id);

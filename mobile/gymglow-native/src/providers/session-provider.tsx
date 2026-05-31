@@ -1,6 +1,7 @@
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { configureRevenueCat } from '@/lib/revenuecat';
 
 type SessionContextValue = {
   session: Session | null;
@@ -19,11 +20,13 @@ export function SessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null);
+      configureRevenueCat(data.session?.user.id).catch(console.warn);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession ?? null);
+      configureRevenueCat(nextSession?.user.id).catch(console.warn);
       setLoading(false);
     });
 

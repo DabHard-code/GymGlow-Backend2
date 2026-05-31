@@ -4,6 +4,7 @@ type Extra = {
   apiBaseUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  revenueCatIosApiKey?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
@@ -12,6 +13,7 @@ export const config = {
   apiBaseUrl: extra.apiBaseUrl ?? '',
   supabaseUrl: extra.supabaseUrl ?? '',
   supabaseAnonKey: extra.supabaseAnonKey ?? '',
+  revenueCatIosApiKey: extra.revenueCatIosApiKey ?? '',
 };
 
 export function assertConfig() {
