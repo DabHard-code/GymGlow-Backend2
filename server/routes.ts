@@ -813,16 +813,16 @@ app.get("/billing/portal", async (req, res) => {
     };
 
     const entitlements = revenueCatData.subscriber?.entitlements ?? {};
-    const hasActiveEntitlement = (name: PaidPlan) => {
-      const entitlement = entitlements[name];
+    const hasActiveEntitlement = (names: string[]) => {
+      const entitlement = names.map((name) => entitlements[name]).find(Boolean);
       if (!entitlement) return false;
       if (!entitlement.expires_date) return true;
       return new Date(entitlement.expires_date).getTime() > Date.now();
     };
 
-    const plan: "none" | PaidPlan = hasActiveEntitlement("competition")
+    const plan: "none" | PaidPlan = hasActiveEntitlement(["competition", "Competition"])
       ? "competition"
-      : hasActiveEntitlement("coach")
+      : hasActiveEntitlement(["coach", "Coach"])
         ? "coach"
         : "none";
 
