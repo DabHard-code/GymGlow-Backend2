@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Alert, StyleSheet, Text, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
@@ -27,40 +27,46 @@ export default function SignUpScreen() {
 
   return (
     <LinearGradient colors={[colors.background, '#111827', '#0F172A']} style={styles.container}>
-      <GlassCard>
-        <Text style={styles.formTitle}>Create your parent account</Text>
-        <Text style={styles.formSubtitle}>Create a private workspace for athletes, uploads, and AI coaching notes.</Text>
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <GlassCard>
+            <Text style={styles.formTitle}>Create your parent account</Text>
+            <Text style={styles.formSubtitle}>Create a private workspace for athletes, uploads, and AI coaching notes.</Text>
 
-        <TextInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Email"
-          placeholderTextColor={colors.textMuted}
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
-        <TextInput
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.textMuted}
-          value={password}
-          onChangeText={setPassword}
-          style={styles.input}
-        />
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Email"
+              placeholderTextColor={colors.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+            />
+            <TextInput
+              secureTextEntry
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+            />
 
-        <PrimaryButton label="Create account" onPress={handleSignUp} loading={loading} />
+            <PrimaryButton label="Create account" onPress={handleSignUp} loading={loading} />
 
-        <Link href="/(auth)/sign-in" asChild>
-          <Text style={styles.link}>Already have an account? Log in</Text>
-        </Link>
-      </GlassCard>
+            <Link href="/(auth)/sign-in" asChild>
+              <Text style={styles.link}>Already have an account? Log in</Text>
+            </Link>
+          </GlassCard>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  container: { flex: 1 },
+  keyboard: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   formTitle: { color: colors.text, fontSize: 24, fontWeight: '800' },
   formSubtitle: { color: colors.textMuted, marginTop: 6, marginBottom: 16, lineHeight: 20 },
   input: {

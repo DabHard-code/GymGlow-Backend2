@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
@@ -26,47 +26,53 @@ export default function SignInScreen() {
 
   return (
     <LinearGradient colors={[colors.background, '#111827', '#0F172A']} style={styles.container}>
-      <View style={styles.hero}>
-        <Image source={require('../../assets/gymglow-logo.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.kicker}>GYMGLOW</Text>
-        <Text style={styles.title}>AI coaching notes, athlete progress, and practice videos in one place.</Text>
-        <Text style={styles.copy}>Log in to review uploads, track athletes, and keep training moving between practices.</Text>
-      </View>
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={styles.hero}>
+            <Image source={require('../../assets/gymglow-logo.png')} style={styles.logo} resizeMode="contain" />
+            <Text style={styles.kicker}>GYMGLOW</Text>
+            <Text style={styles.title}>AI coaching notes, athlete progress, and practice videos in one place.</Text>
+            <Text style={styles.copy}>Log in to review uploads, track athletes, and keep training moving between practices.</Text>
+          </View>
 
-      <GlassCard>
-        <Text style={styles.formTitle}>Welcome back</Text>
-        <Text style={styles.formSubtitle}>Log in with the same account you already use on the web app.</Text>
+          <GlassCard>
+            <Text style={styles.formTitle}>Welcome back</Text>
+            <Text style={styles.formSubtitle}>Log in with the same account you already use on the web app.</Text>
 
-        <TextInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Email"
-          placeholderTextColor={colors.textMuted}
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
-        <TextInput
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.textMuted}
-          value={password}
-          onChangeText={setPassword}
-          style={styles.input}
-        />
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Email"
+              placeholderTextColor={colors.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+            />
+            <TextInput
+              secureTextEntry
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+            />
 
-        <PrimaryButton label="Log in" onPress={handleSignIn} loading={loading} />
+            <PrimaryButton label="Log in" onPress={handleSignIn} loading={loading} />
 
-        <Link href="/(auth)/sign-up" asChild>
-          <Text style={styles.link}>Need an account? Create one</Text>
-        </Link>
-      </GlassCard>
+            <Link href="/(auth)/sign-up" asChild>
+              <Text style={styles.link}>Need an account? Create one</Text>
+            </Link>
+          </GlassCard>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center', gap: 20 },
+  container: { flex: 1 },
+  keyboard: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 20 },
   hero: { marginBottom: 8 },
   logo: { width: 190, height: 108, alignSelf: 'center', marginBottom: 16 },
   kicker: { color: colors.secondary, fontWeight: '800', letterSpacing: 1.4, fontSize: 12, marginBottom: 10 },
