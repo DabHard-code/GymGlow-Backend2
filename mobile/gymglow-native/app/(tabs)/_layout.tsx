@@ -17,6 +17,8 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: '#07111F' },
         headerTintColor: colors.text,
         headerShadowVisible: false,
+        headerBackTitle: '',
+        headerBackButtonDisplayMode: 'minimal',
         headerTitleStyle: { fontWeight: '900' },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textMuted,
@@ -31,8 +33,12 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} /> }} />
       <Tabs.Screen name="athletes" options={{ title: 'Athletes', tabBarIcon: ({ color, size }) => <Ionicons name="people" color={color} size={size} /> }} />
+      <Tabs.Screen name="athletes/[id]" options={{ href: null, title: 'Athlete' }} />
       <Tabs.Screen name="upload" options={{ title: 'Upload', tabBarIcon: ({ color, size }) => <Ionicons name="cloud-upload" color={color} size={size} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Ionicons name="settings" color={color} size={size} /> }} />
+      <Tabs.Screen name="competition" options={{ title: 'Competition', tabBarIcon: ({ color, size }) => <Ionicons name="trophy" color={color} size={size} /> }} />
+      <Tabs.Screen name="badges" options={{ href: null, title: 'Badges' }} />
+      <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal-circle" color={color} size={size} /> }} />
+      <Tabs.Screen name="settings" options={{ href: null, title: 'Settings' }} />
     </Tabs>
   );
 }

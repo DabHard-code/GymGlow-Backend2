@@ -5,6 +5,13 @@ import { configureRevenueCat, isRevenueCatAvailable } from '@/lib/revenuecat';
 
 export type PaidPlan = 'coach' | 'competition';
 
+export class PurchaseCancelledError extends Error {
+  constructor() {
+    super('Purchase cancelled');
+    this.name = 'PurchaseCancelledError';
+  }
+}
+
 type CheckoutResponse = {
   url?: string;
 };
@@ -44,8 +51,13 @@ async function startRevenueCatCheckout(plan: PaidPlan) {
   await configureRevenueCat();
 
   const revenueCatPackage = await findPackageForPlan(plan);
-  const result = await Purchases.purchasePackage(revenueCatPackage);
-  await syncRevenueCatPlan(result.customerInfo);
+  try {
+    const result = await Purchases.purchasePackage(revenueCatPackage);
+    await syncRevenueCatPlan(result.customerInfo);
+  } catch (error) {
+    if (isPurchaseCancelled(error)) throw new PurchaseCancelledError();
+    throw error;
+  }
 }
 
 async function findPackageForPlan(plan: PaidPlan): Promise<PurchasesPackage> {
@@ -64,4 +76,10 @@ async function findPackageForPlan(plan: PaidPlan): Promise<PurchasesPackage> {
 async function syncRevenueCatPlan(customerInfo: CustomerInfo) {
   const activeEntitlements = Object.keys(customerInfo.entitlements.active);
   return apiPost<PlanSyncResponse>('/api/billing/revenuecat-sync', { activeEntitlements });
+}
+
+function isPurchaseCancelled(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as { userCancelled?: unknown; code?: unknown; message?: unknown };
+  return value.userCancelled === true || value.code === '1' || String(value.message ?? '').toLowerCase().includes('cancel');
 }

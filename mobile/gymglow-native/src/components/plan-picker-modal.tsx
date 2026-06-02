@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/primary-button';
-import { restorePlanPurchases, startPlanCheckout, type PaidPlan } from '@/lib/billing';
+import { PurchaseCancelledError, restorePlanPurchases, startPlanCheckout, type PaidPlan } from '@/lib/billing';
 import { colors } from '@/theme/colors';
 
 export function PlanPickerModal({ visible, onClose, message }: { visible: boolean; onClose: () => void; message?: string }) {
@@ -18,6 +18,7 @@ export function PlanPickerModal({ visible, onClose, message }: { visible: boolea
       await queryClient.invalidateQueries({ queryKey: ['me'] });
       onClose();
     } catch (error: any) {
+      if (error instanceof PurchaseCancelledError) return;
       Alert.alert('Could not open checkout', error?.message ?? 'Please try again.');
     } finally {
       setLoadingPlan(null);

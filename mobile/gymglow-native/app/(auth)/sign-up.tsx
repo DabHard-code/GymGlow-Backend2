@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
@@ -16,7 +16,7 @@ export default function SignUpScreen() {
     try {
       setLoading(true);
       await signUpWithEmail(email.trim(), password);
-      Alert.alert('Check your email', 'Confirm your account from the email Supabase sends, then log in.');
+      Alert.alert('Check your email', 'Confirm your GymGlow account from the email we sent, then log in.');
       router.replace('/(auth)/sign-in');
     } catch (error: any) {
       Alert.alert('Sign up failed', error?.message ?? 'Please try again.');
@@ -29,7 +29,7 @@ export default function SignUpScreen() {
     <LinearGradient colors={[colors.background, '#111827', '#0F172A']} style={styles.container}>
       <GlassCard>
         <Text style={styles.formTitle}>Create your parent account</Text>
-        <Text style={styles.formSubtitle}>This keeps auth native while your current backend keeps doing the heavy lifting.</Text>
+        <Text style={styles.formSubtitle}>Create a private workspace for athletes, uploads, and AI coaching notes.</Text>
 
         <TextInput
           autoCapitalize="none"

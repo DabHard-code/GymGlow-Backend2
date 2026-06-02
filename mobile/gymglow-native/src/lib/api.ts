@@ -32,10 +32,24 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`${res.status}: ${text || res.statusText}`);
+    throw new Error(readErrorMessage(text, res.statusText));
   }
 
   return text ? (JSON.parse(text) as T) : ({} as T);
+}
+
+function readErrorMessage(text: string, fallback: string) {
+  if (!text) return fallback;
+
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+    const message = parsed.error ?? parsed.message;
+    if (typeof message === 'string' && message.trim()) return message;
+  } catch {
+    // Fall through to plain text.
+  }
+
+  return text;
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
@@ -45,6 +59,23 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
-export async function apiDelete(path: string): Promise<void> {
-  await apiFetch(path, { method: 'DELETE' });
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'PUT',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'PATCH',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+export async function apiDelete(path: string, body?: unknown): Promise<void> {
+  await apiFetch(path, {
+    method: 'DELETE',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 }

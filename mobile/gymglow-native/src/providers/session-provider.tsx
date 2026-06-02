@@ -1,5 +1,8 @@
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
+import { router } from 'expo-router';
+import { handleAuthDeepLink } from '@/lib/deep-link-auth';
 import { supabase } from '@/lib/supabase';
 import { configureRevenueCat } from '@/lib/revenuecat';
 
@@ -18,6 +21,20 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    async function processAuthLink(url: string | null) {
+      try {
+        await handleAuthDeepLink(url);
+        if (url?.includes('auth/callback')) router.replace('/(tabs)');
+      } catch (error) {
+        console.warn('Could not finish auth link', error);
+      }
+    }
+
+    Linking.getInitialURL().then(processAuthLink);
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => {
+      processAuthLink(url);
+    });
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session ?? null);
       configureRevenueCat(data.session?.user.id).catch(console.warn);
@@ -30,7 +47,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
       setLoading(false);
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      linkSubscription.remove();
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const value = useMemo(() => ({ session, loading }), [session, loading]);

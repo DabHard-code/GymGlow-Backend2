@@ -1,11 +1,12 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Screen } from '@/components/screen';
 import { SectionTitle } from '@/components/section-title';
 import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
 import { AthleteRow } from '@/components/athlete-row';
+import { EmptyState } from '@/components/empty-state';
 import { apiFetch, apiPost } from '@/lib/api';
 import type { Athlete, SportProfile } from '@/lib/types';
 import { colors } from '@/theme/colors';
@@ -33,6 +34,7 @@ export default function AthletesTab() {
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['athletes'] });
     },
+    onError: (error: any) => Alert.alert('Could not add athlete', error?.message ?? 'Please try again.'),
   });
 
   const profilesByAthlete = useMemo(
@@ -50,6 +52,26 @@ export default function AthletesTab() {
           <PrimaryButton label="Add athlete" onPress={() => setOpen(true)} />
         </View>
       </GlassCard>
+
+      {athletesQuery.isError ? (
+        <EmptyState
+          icon="cloud-offline"
+          title="Athletes did not load"
+          description="Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => athletesQuery.refetch()}
+        />
+      ) : null}
+
+      {!athletesQuery.isLoading && !athletesQuery.isError && !athletesQuery.data?.length ? (
+        <EmptyState
+          icon="person-add"
+          title="No athletes yet"
+          description="Start with one private athlete profile. You can add their public leaderboard alias and sport level next."
+          actionLabel="Add athlete"
+          onAction={() => setOpen(true)}
+        />
+      ) : null}
 
       {(athletesQuery.data ?? []).map((athlete) => (
         <AthleteRow key={athlete.id} athlete={athlete} profiles={profilesByAthlete[athlete.id]} />

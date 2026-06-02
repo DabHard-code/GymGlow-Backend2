@@ -9,7 +9,7 @@ export function AthleteRow({ athlete, profiles = [] }: { athlete: Athlete; profi
   const initials = athlete.name.slice(0, 2).toUpperCase();
 
   return (
-    <Pressable onPress={() => router.push(`/athletes/${athlete.id}`)}>
+    <Pressable onPress={() => router.push({ pathname: '/(tabs)/athletes/[id]', params: { id: athlete.id } })}>
       <GlassCard style={styles.card}>
         <View style={styles.row}>
           <View style={styles.avatar}>

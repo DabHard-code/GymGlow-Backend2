@@ -16,7 +16,7 @@ export async function configureRevenueCat(appUserId?: string | null) {
 
   if (!configured) {
     if (__DEV__) {
-      await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      await Purchases.setLogLevel(Purchases.LOG_LEVEL.WARN);
     }
 
     Purchases.configure({

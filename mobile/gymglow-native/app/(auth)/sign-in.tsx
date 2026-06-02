@@ -28,9 +28,9 @@ export default function SignInScreen() {
     <LinearGradient colors={[colors.background, '#111827', '#0F172A']} style={styles.container}>
       <View style={styles.hero}>
         <Image source={require('../../assets/gymglow-logo.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.kicker}>GYMGLOW NATIVE</Text>
-        <Text style={styles.title}>A cleaner mobile experience for parents, athletes, and progress tracking.</Text>
-        <Text style={styles.copy}>This native shell talks to your existing backend and Supabase auth.</Text>
+        <Text style={styles.kicker}>GYMGLOW</Text>
+        <Text style={styles.title}>AI coaching notes, athlete progress, and practice videos in one place.</Text>
+        <Text style={styles.copy}>Log in to review uploads, track athletes, and keep training moving between practices.</Text>
       </View>
 
       <GlassCard>
