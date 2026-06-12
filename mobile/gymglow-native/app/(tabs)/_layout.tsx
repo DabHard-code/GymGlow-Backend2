@@ -17,7 +17,6 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: '#07111F' },
         headerTintColor: colors.text,
         headerShadowVisible: false,
-        headerBackTitle: '',
         headerBackButtonDisplayMode: 'minimal',
         headerTitleStyle: { fontWeight: '900' },
         tabBarActiveTintColor: colors.text,

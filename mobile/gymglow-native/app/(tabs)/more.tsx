@@ -6,6 +6,7 @@ import { GlassCard } from '@/components/glass-card';
 import { Screen } from '@/components/screen';
 import { SectionTitle } from '@/components/section-title';
 import { PrimaryButton } from '@/components/primary-button';
+import { PlanPickerModal } from '@/components/plan-picker-modal';
 import { apiFetch } from '@/lib/api';
 import type { Athlete } from '@/lib/types';
 import { colors } from '@/theme/colors';
@@ -13,6 +14,7 @@ import { useState } from 'react';
 
 export default function MoreTab() {
   const [meetPickerOpen, setMeetPickerOpen] = useState(false);
+  const [planPickerOpen, setPlanPickerOpen] = useState(false);
   const athletesQuery = useQuery({
     queryKey: ['athletes'],
     queryFn: () => apiFetch<Athlete[]>('/api/athletes'),
@@ -33,8 +35,9 @@ export default function MoreTab() {
 
   return (
     <Screen>
-      <SectionTitle title="More" subtitle="Badges, meet scores, settings, and support." />
+      <SectionTitle title="More" subtitle="Plans, badges, meet scores, settings, and support." />
       <GlassCard style={styles.card}>
+        <MoreRow icon="card" title="Plans & subscriptions" copy="View Coach Mode and Competition Mode or restore purchases." onPress={() => setPlanPickerOpen(true)} />
         <MoreRow icon="ribbon" title="Badges" copy="Review earned milestones and progress across each athlete." onPress={() => router.push('/(tabs)/badges')} />
         <MoreRow icon="clipboard" title="Meet Tracker" copy="Save meet scores, placements, seasons, and all-around totals." onPress={openMeetTracker} />
         <MoreRow icon="settings" title="Settings" copy="Account, privacy, support, and logout." onPress={() => router.push('/(tabs)/settings')} />
@@ -69,6 +72,7 @@ export default function MoreTab() {
           </View>
         </View>
       </Modal>
+      <PlanPickerModal visible={planPickerOpen} onClose={() => setPlanPickerOpen(false)} />
     </Screen>
   );
 }

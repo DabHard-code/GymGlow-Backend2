@@ -60,7 +60,7 @@ export default function UploadTab() {
   const [planPickerOpen, setPlanPickerOpen] = useState(false);
   const athletesQuery = useQuery({ queryKey: ['athletes'], queryFn: () => apiFetch<Athlete[]>('/api/athletes') });
   const profilesQuery = useQuery({
-    queryKey: ['upload-profiles', selectedAthleteId],
+    queryKey: ['profiles', selectedAthleteId],
     enabled: !!selectedAthleteId,
     queryFn: () => apiFetch<SportProfile[]>(`/api/athletes/${selectedAthleteId}/profiles`),
   });

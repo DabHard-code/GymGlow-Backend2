@@ -1,9 +1,10 @@
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/primary-button';
 import { PurchaseCancelledError, restorePlanPurchases, startPlanCheckout, type PaidPlan } from '@/lib/billing';
+import { config } from '@/lib/config';
 import { colors } from '@/theme/colors';
 
 export function PlanPickerModal({ visible, onClose, message }: { visible: boolean; onClose: () => void; message?: string }) {
@@ -39,6 +40,14 @@ export function PlanPickerModal({ visible, onClose, message }: { visible: boolea
     }
   }
 
+  async function openLink(url: string) {
+    try {
+      await Linking.openURL(url);
+    } catch (error: any) {
+      Alert.alert('Could not open link', error?.message ?? 'Please try again.');
+    }
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -53,7 +62,7 @@ export function PlanPickerModal({ visible, onClose, message }: { visible: boolea
 
           <PlanCard
             title="Coach Mode"
-            price="$9.99/mo"
+            price="$9.99/month"
             copy="AI analysis, athlete progress, meet score tracking, and badges."
             icon="barbell"
             loading={loadingPlan === 'coach'}
@@ -62,13 +71,25 @@ export function PlanPickerModal({ visible, onClose, message }: { visible: boolea
           />
           <PlanCard
             title="Competition Mode"
-            price="$19.99/mo"
+            price="$19.99/month"
             copy="Everything in Coach plus weekly challenges, leaderboard competition, spotlight eligibility, and Crimson badges."
             icon="trophy"
             loading={loadingPlan === 'competition'}
             disabled={loadingPlan !== null}
             onPress={() => startCheckout('competition')}
           />
+
+          <Text style={styles.renewalCopy}>
+            Payment is charged to your Apple ID. Subscriptions renew monthly unless canceled at least 24 hours before the end of the current period.
+          </Text>
+          <View style={styles.legalRow}>
+            <Pressable onPress={() => openLink(`${config.apiBaseUrl}/privacy`)} style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}>
+              <Text style={styles.legalLinkText}>Privacy Policy</Text>
+            </Pressable>
+            <Pressable onPress={() => openLink(`${config.apiBaseUrl}/terms`)} style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}>
+              <Text style={styles.legalLinkText}>Terms of Use</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.cancelWrap}>
             <PrimaryButton label={restoring ? 'Restoring...' : 'Restore purchases'} onPress={restorePurchases} variant="ghost" disabled={loadingPlan !== null || restoring} />
@@ -146,6 +167,10 @@ const styles = StyleSheet.create({
   planDescription: { color: colors.textMuted, lineHeight: 18, marginTop: 4, fontSize: 12 },
   pricePill: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(236,72,153,0.18)', borderWidth: 1, borderColor: 'rgba(236,72,153,0.38)' },
   priceText: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  renewalCopy: { color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 14 },
+  legalRow: { flexDirection: 'row', gap: 18, marginTop: 12 },
+  legalLink: { paddingVertical: 4 },
+  legalLinkText: { color: colors.secondary, fontSize: 12, fontWeight: '900', textDecorationLine: 'underline' },
   cancelWrap: { marginTop: 14 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.7 },

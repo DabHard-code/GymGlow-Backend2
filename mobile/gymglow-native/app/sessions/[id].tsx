@@ -39,6 +39,7 @@ export default function SessionResultScreen() {
     queryFn: () => fetchAnalysisOrNull(id),
     refetchInterval: (query) => (query.state.data ? false : 2500),
   });
+  const analysis = analysisQuery.data;
   const badgesQuery = useQuery({
     queryKey: ['analysis-badges', analysis?.id],
     enabled: !!analysis?.id,
@@ -47,7 +48,6 @@ export default function SessionResultScreen() {
 
   const status = sessionQuery.data?.status ?? 'processing';
   const isWorking = status === 'uploading' || status === 'processing' || status === 'analyzing';
-  const analysis = analysisQuery.data;
   const activeTip = analyzingTips[tipIndex % analyzingTips.length];
 
   useEffect(() => {

@@ -424,6 +424,7 @@ const styles = StyleSheet.create({
   blockTitle: { color: colors.text, fontSize: 18, fontWeight: '900', marginBottom: 12 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   muted: { color: colors.textMuted, lineHeight: 21 },
+  pressed: { opacity: 0.72 },
   loadingLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   seasonStack: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   seasonPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white10 },
