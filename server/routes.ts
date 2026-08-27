@@ -1263,6 +1263,32 @@ app.get("/billing/portal", async (req, res) => {
     res.status(201).json(created);
   });
 
+  app.patch("/api/meets/:meetId", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const meet = await storage.getMeet(req.params.meetId);
+    if (!meet) return res.status(404).json({ error: "Not found" });
+
+    const season = await storage.getSeason(meet.seasonId);
+    if (!season) return res.status(404).json({ error: "Not found" });
+
+    const athlete = await storage.getAthlete(season.athleteId);
+    if (!athlete || athlete.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+    const parsed = createMeetSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const updated = await storage.updateMeet(req.params.meetId, {
+      ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+      ...(parsed.data.meetDate !== undefined ? { meetDate: parseMeetDate(parsed.data.meetDate) } : {}),
+      ...(parsed.data.location !== undefined ? { location: parsed.data.location } : {}),
+      ...(parsed.data.notes !== undefined ? { notes: parsed.data.notes } : {}),
+    } as any);
+
+    res.json(updated);
+  });
+
   app.delete("/api/meets/:meetId", async (req, res) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
@@ -1334,6 +1360,43 @@ app.get("/billing/portal", async (req, res) => {
 
     const created = await storage.createMeetScores(rows as any);
     res.status(201).json(created);
+  });
+
+  app.put("/api/meets/:meetId/scores", async (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const meet = await storage.getMeet(req.params.meetId);
+    if (!meet) return res.status(404).json({ error: "Not found" });
+
+    const season = await storage.getSeason(meet.seasonId);
+    if (!season) return res.status(404).json({ error: "Not found" });
+
+    const athlete = await storage.getAthlete(season.athleteId);
+    if (!athlete || athlete.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+    const parsed = createMeetScoresSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+
+    const existing = await storage.getScoresByMeet(req.params.meetId);
+    await Promise.all(existing.map((score) => storage.deleteMeetScore(score.id)));
+
+    const items = Array.isArray(parsed.data) ? parsed.data : parsed.data.scores;
+    const rows = items.map((r) => ({
+      meetId: req.params.meetId,
+      category: (r.category ?? r.apparatus) as string,
+      score: r.score == null ? null : String(r.score),
+      placement:
+        r.placement == null
+          ? undefined
+          : typeof r.placement === "number"
+            ? r.placement
+            : (Number(r.placement) || undefined),
+      notes: r.notes,
+    }));
+
+    const created = await storage.createMeetScores(rows as any);
+    res.json(created);
   });
 
   /* ==================== ANALYZE VIDEO ==================== */
