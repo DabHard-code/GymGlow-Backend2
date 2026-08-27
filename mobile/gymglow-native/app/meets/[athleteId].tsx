@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { SectionTitle } from '@/components/section-title';
-import { apiDelete, apiFetch, apiPost } from '@/lib/api';
+import { apiDelete, apiFetch, apiPatch, apiPost, apiPut } from '@/lib/api';
 import type { Athlete, MeetWithScores, Season } from '@/lib/types';
 import { colors } from '@/theme/colors';
 import { useLocalSearchParams } from 'expo-router';
@@ -43,6 +43,7 @@ export default function MeetTrackerScreen() {
   const [meetName, setMeetName] = useState('');
   const [meetDate, setMeetDate] = useState(today());
   const [meetLocation, setMeetLocation] = useState('');
+  const [editingMeetId, setEditingMeetId] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<EventKey, { score: string; placement: string }>>({
     vault: { score: '', placement: '' },
     bars: { score: '', placement: '' },
@@ -88,14 +89,17 @@ export default function MeetTrackerScreen() {
     onError: (error: any) => Alert.alert('Could not add season', error?.message ?? 'Please try again.'),
   });
 
-  const addMeet = useMutation({
+  const saveMeet = useMutation({
     mutationFn: async () => {
       if (!selectedSeason) throw new Error('Create a season first.');
-      const meet = await apiPost<MeetWithScores>(`/api/seasons/${selectedSeason.id}/meets`, {
+      const meetPayload = {
         name: meetName.trim(),
         meetDate,
         location: meetLocation.trim() || undefined,
-      });
+      };
+      const meet = editingMeetId
+        ? await apiPatch<MeetWithScores>(`/api/meets/${editingMeetId}`, meetPayload)
+        : await apiPost<MeetWithScores>(`/api/seasons/${selectedSeason.id}/meets`, meetPayload);
 
       const rows = events
         .map((event) => ({
@@ -105,7 +109,9 @@ export default function MeetTrackerScreen() {
         }))
         .filter((row) => row.score || row.placement);
 
-      if (rows.length) {
+      if (editingMeetId) {
+        await apiPut(`/api/meets/${editingMeetId}/scores`, { scores: rows });
+      } else if (rows.length) {
         await apiPost(`/api/meets/${meet.id}/scores`, { scores: rows });
       }
 
@@ -116,7 +122,7 @@ export default function MeetTrackerScreen() {
       resetMeetForm();
       await queryClient.invalidateQueries({ queryKey: ['meets', selectedSeason?.id] });
     },
-    onError: (error: any) => Alert.alert('Could not add meet', error?.message ?? 'Please try again.'),
+    onError: (error: any) => Alert.alert('Could not save meet', error?.message ?? 'Please try again.'),
   });
 
   const deleteSeason = useMutation({
@@ -148,10 +154,30 @@ export default function MeetTrackerScreen() {
       setSeasonOpen(true);
       return;
     }
+    resetMeetForm();
+    setMeetOpen(true);
+  }
+
+  function openEditMeetForm(meet: MeetWithScores) {
+    setEditingMeetId(meet.id);
+    setMeetName(meet.name);
+    setMeetDate(formatDateInput(meet.meetDate));
+    setMeetLocation(meet.location ?? '');
+    setScores(events.reduce(
+      (next, event) => {
+        next[event.key] = {
+          score: scoreFor(meet, event.key),
+          placement: String(placementFor(meet, event.key) ?? ''),
+        };
+        return next;
+      },
+      {} as Record<EventKey, { score: string; placement: string }>,
+    ));
     setMeetOpen(true);
   }
 
   function resetMeetForm() {
+    setEditingMeetId(null);
     setMeetName('');
     setMeetDate(today());
     setMeetLocation('');
@@ -242,7 +268,7 @@ export default function MeetTrackerScreen() {
         {!selectedSeason ? <Text style={styles.muted}>Create a season to start adding meets.</Text> : null}
         {selectedSeason && !meetsQuery.isLoading && !meets.length ? <Text style={styles.muted}>No meets recorded for this season yet.</Text> : null}
         {meets.map((meet) => (
-          <MeetCard key={meet.id} meet={meet} onDelete={() => confirmDeleteMeet(meet)} deleting={deleteMeet.isPending} />
+          <MeetCard key={meet.id} meet={meet} onEdit={() => openEditMeetForm(meet)} onDelete={() => confirmDeleteMeet(meet)} deleting={deleteMeet.isPending} />
         ))}
         <View style={styles.buttonSpacer} />
         <PrimaryButton label="Add meet score" onPress={openMeetForm} />
@@ -310,9 +336,21 @@ export default function MeetTrackerScreen() {
                 </View>
               ))}
             </View>
-            <PrimaryButton label="Save meet" onPress={() => addMeet.mutate()} loading={addMeet.isPending} disabled={!meetName.trim()} />
+            <PrimaryButton
+              label={editingMeetId ? 'Save changes' : 'Save meet'}
+              onPress={() => saveMeet.mutate()}
+              loading={saveMeet.isPending}
+              disabled={!meetName.trim()}
+            />
             <View style={styles.modalSpacer} />
-            <PrimaryButton label="Cancel" onPress={() => setMeetOpen(false)} variant="ghost" />
+            <PrimaryButton
+              label="Cancel"
+              onPress={() => {
+                setMeetOpen(false);
+                resetMeetForm();
+              }}
+              variant="ghost"
+            />
           </View>
         </View>
       </Modal>
@@ -320,7 +358,7 @@ export default function MeetTrackerScreen() {
   );
 }
 
-function MeetCard({ meet, onDelete, deleting }: { meet: MeetWithScores; onDelete: () => void; deleting: boolean }) {
+function MeetCard({ meet, onEdit, onDelete, deleting }: { meet: MeetWithScores; onEdit: () => void; onDelete: () => void; deleting: boolean }) {
   const allAround = scoreFor(meet, 'all_around') || calculatedAllAround(meet);
 
   return (
@@ -342,6 +380,9 @@ function MeetCard({ meet, onDelete, deleting }: { meet: MeetWithScores; onDelete
             <Text style={styles.aaLabel}>AA</Text>
           </View>
         ) : null}
+        <Pressable onPress={onEdit} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+          <Ionicons name="create-outline" size={16} color={colors.secondary} />
+        </Pressable>
         <Pressable onPress={onDelete} disabled={deleting} style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed, deleting && styles.disabled]}>
           <Ionicons name="trash" size={16} color={colors.danger} />
         </Pressable>
@@ -399,6 +440,13 @@ function formatDate(value: string | Date) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateInput(value: string | Date) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return today();
+  return date.toISOString().slice(0, 10);
 }
 
 const styles = StyleSheet.create({
@@ -459,6 +507,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251,113,133,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(251,113,133,0.24)',
+  },
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(34,211,238,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,211,238,0.24)',
   },
   smallDelete: {
     width: 28,
