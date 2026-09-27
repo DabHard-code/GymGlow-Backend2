@@ -7,6 +7,7 @@ export async function handleAuthDeepLink(url: string | null) {
   if (!url) return;
 
   const params = readUrlParams(url);
+  if (params.get('error_description') || params.get('error')) throw new Error(params.get('error_description') || 'Invalid auth link');
   const accessToken = params.get('access_token');
   const refreshToken = params.get('refresh_token');
   const code = params.get('code');
@@ -24,6 +25,11 @@ export async function handleAuthDeepLink(url: string | null) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) throw error;
   }
+}
+
+export function isRecoveryLink(url: string) {
+  const params = readUrlParams(url);
+  return params.get('type') === 'recovery' || params.get('recovery') === '1';
 }
 
 function readUrlParams(url: string) {

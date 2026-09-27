@@ -1,3 +1,4 @@
+import { generatedPublicAlias, publicAliasForAthlete } from "../shared/public-alias";
 // server/routes.ts
 import type { Express, NextFunction, Request, Response } from "express";
 import { type Server } from "http";
@@ -21,34 +22,6 @@ import { supabaseAdmin } from "./supabase.js";
 import { getStripe, getPriceIdForPlan, planFromPriceId, type PaidPlan } from "./stripe"; import multer from "multer";
 
 /* ==================== VIDEO FILE DOWNLOAD HELPERS ==================== */
-
-const PUBLIC_ALIAS_WORDS = [
-  "Beam Star",
-  "Vault Spark",
-  "Floor Flyer",
-  "Bar Bright",
-  "Glow Champ",
-  "Landing Star",
-  "Core Spark",
-  "Balance Ace",
-];
-
-function hashToNumber(input: string) {
-  // Simple stable hash for anonymous naming (not security-related)
-  let h = 0;
-  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-function generatedPublicAlias(athleteId: string): string {
-  const hash = hashToNumber(athleteId);
-  const label = PUBLIC_ALIAS_WORDS[hash % PUBLIC_ALIAS_WORDS.length];
-  return `${label} ${String(hash % 1000).padStart(3, "0")}`;
-}
-
-function publicAliasForAthlete(athlete: { id: string; publicDisplayName?: string | null }): string {
-  return athlete.publicDisplayName?.trim() || generatedPublicAlias(athlete.id);
-}
 
 function sanitizePublicAlias(input: string): string {
   return input

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { signInWithEmail, signUpWithEmail, getCurrentUser } from "@/auth";
 
 type Mode = "login" | "signup";
@@ -141,6 +141,7 @@ export default function AuthPage() {
                 : "Create account"}
           </button>
         </form>
+        <Link href="/forgot-password" className="block mt-4 text-center text-sm text-sky-400">Forgot password?</Link>
       </div>
     </div>
   );

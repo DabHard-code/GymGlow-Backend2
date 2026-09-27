@@ -1,3 +1,4 @@
+import { publicAliasForAthlete } from "@shared/public-alias";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -125,7 +126,7 @@ const { data: athletes = [] } = useQuery<Athlete[]>({
                 </SelectTrigger>
                 <SelectContent>
                   {athletes.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>{publicAliasForAthlete(a)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

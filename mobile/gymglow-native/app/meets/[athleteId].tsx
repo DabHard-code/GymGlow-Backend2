@@ -1,3 +1,4 @@
+import { FormSheet } from '@/components/form-sheet';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -289,7 +290,7 @@ export default function MeetTrackerScreen() {
       ) : null}
 
       <Modal visible={seasonOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Add season</Text>
             <Text style={styles.inputLabel}>Season name</Text>
@@ -300,11 +301,11 @@ export default function MeetTrackerScreen() {
             <View style={styles.modalSpacer} />
             <PrimaryButton label="Cancel" onPress={() => setSeasonOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
 
       <Modal visible={meetOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Add meet score</Text>
             <Text style={styles.inputLabel}>Meet name</Text>
@@ -352,7 +353,7 @@ export default function MeetTrackerScreen() {
               variant="ghost"
             />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
     </Screen>
   );
@@ -450,6 +451,7 @@ function formatDateInput(value: string | Date) {
 }
 
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.7 },
   heroCard: { marginBottom: 16 },
   heroIcon: {
     width: 62,

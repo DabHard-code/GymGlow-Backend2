@@ -20,6 +20,7 @@ import ChallengesPage from "@/pages/challenges";
 import LeaderboardPage from "@/pages/leaderboard";
 import SkillsPage from "@/pages/skills";
 import MeetScoresPage from "@/pages/meet-scores";
+import PasswordRecoveryPage from "@/pages/password-recovery";
 import AuthPage from "@/pages/auth";
 import BadgesPage from "@/pages/badges";
 import CompetitionResultsPage from "@/pages/competition-results";
@@ -123,6 +124,8 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      <Route path="/forgot-password" component={PasswordRecoveryPage} />
+      <Route path="/reset-password" component={PasswordRecoveryPage} />
       {/* Auth route: parents can log in / sign up here */}
       <Route
         path="/auth"

@@ -31,6 +31,8 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)/sign-up" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)/forgot-password" options={{ title: 'Reset password' }} />
+          <Stack.Screen name="(auth)/reset-password" options={{ title: 'New password' }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="athletes/[id]" options={{ title: 'Athlete' }} />
           <Stack.Screen name="meets/[athleteId]" options={{ title: 'Meet Tracker', headerBackTitle: 'More' }} />

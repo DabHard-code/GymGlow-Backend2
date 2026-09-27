@@ -1,3 +1,4 @@
+import { publicAliasForAthlete } from "../../../../shared/public-alias";
 import { useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -143,7 +144,7 @@ export default function CompetitionTab() {
             const active = profile.id === selectedProfileId;
             return (
               <Pressable key={profile.id} onPress={() => setSelectedProfileId(profile.id)} style={[styles.profilePill, active && styles.profilePillActive]}>
-                <Text style={styles.profileName}>{athlete.name}</Text>
+                <Text style={styles.profileName}>{publicAliasForAthlete(athlete)}</Text>
                 <Text style={styles.profileMeta}>
                   {profile.sport} - {profile.level}
                 </Text>

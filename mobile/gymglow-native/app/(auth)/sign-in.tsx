@@ -1,6 +1,7 @@
+import { KeyboardScrollView } from '@/components/keyboard-scroll-view';
 import { useState } from 'react';
 import { Link, router } from 'expo-router';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '@/components/glass-card';
 import { PrimaryButton } from '@/components/primary-button';
@@ -26,8 +27,7 @@ export default function SignInScreen() {
 
   return (
     <LinearGradient colors={[colors.background, '#111827', '#0F172A']} style={styles.container}>
-      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <Image source={require('../../assets/gymglow-logo.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.kicker}>GYMGLOW</Text>
@@ -57,21 +57,21 @@ export default function SignInScreen() {
               style={styles.input}
             />
 
+            <Link href="/(auth)/forgot-password" asChild><Text style={[styles.link, { marginBottom: 16 }]}>Forgot password?</Text></Link>
+
             <PrimaryButton label="Log in" onPress={handleSignIn} loading={loading} />
 
             <Link href="/(auth)/sign-up" asChild>
               <Text style={styles.link}>Need an account? Create one</Text>
             </Link>
           </GlassCard>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  keyboard: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 20 },
   hero: { marginBottom: 8 },
   logo: { width: 190, height: 108, alignSelf: 'center', marginBottom: 16 },

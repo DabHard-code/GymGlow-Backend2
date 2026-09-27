@@ -1,5 +1,6 @@
+import { KeyboardScrollView } from './keyboard-scroll-view';
 import { PropsWithChildren } from 'react';
-import { ScrollView, ScrollViewProps, StyleSheet, View } from 'react-native';
+import { ScrollViewProps, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/theme/colors';
@@ -10,7 +11,7 @@ export function Screen({ children, padded = true, contentContainerStyle, ...prop
   return (
     <LinearGradient colors={[colors.background, '#111528', '#0A1E2A']} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView
+        <KeyboardScrollView
           {...props}
           style={styles.scroll}
           contentContainerStyle={[
@@ -20,7 +21,7 @@ export function Screen({ children, padded = true, contentContainerStyle, ...prop
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.inner}>{children}</View>
-        </ScrollView>
+        </KeyboardScrollView>
       </SafeAreaView>
     </LinearGradient>
   );

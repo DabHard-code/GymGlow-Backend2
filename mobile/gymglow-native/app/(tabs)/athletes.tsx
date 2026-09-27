@@ -1,3 +1,4 @@
+import { FormSheet } from '@/components/form-sheet';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -78,7 +79,7 @@ export default function AthletesTab() {
       ))}
 
       <Modal visible={open} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Add athlete</Text>
             <TextInput
@@ -93,7 +94,7 @@ export default function AthletesTab() {
             <View style={{ height: 12 }} />
             <PrimaryButton label="Cancel" onPress={() => setOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
     </Screen>
   );

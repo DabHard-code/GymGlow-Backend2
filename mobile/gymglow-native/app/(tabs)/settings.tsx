@@ -1,3 +1,4 @@
+import { FormSheet } from '@/components/form-sheet';
 import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -136,7 +137,7 @@ export default function SettingsTab() {
       <PrimaryButton label="Log out" onPress={handleLogout} variant="ghost" />
 
       <Modal visible={editOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Edit display name</Text>
             <Text style={styles.modalCopy}>This is only shown inside your private account.</Text>
@@ -145,11 +146,11 @@ export default function SettingsTab() {
             <View style={styles.modalButtonSpacer} />
             <PrimaryButton label="Cancel" onPress={() => setEditOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
 
       <Modal visible={supportOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Contact support</Text>
             <View style={styles.typeRow}>
@@ -171,11 +172,11 @@ export default function SettingsTab() {
             <View style={styles.modalButtonSpacer} />
             <PrimaryButton label="Cancel" onPress={() => setSupportOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
 
       <Modal visible={deleteOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Delete account</Text>
             <Text style={styles.modalCopy}>This removes your GymGlow account data. Type DELETE MY ACCOUNT to confirm.</Text>
@@ -184,7 +185,7 @@ export default function SettingsTab() {
             <View style={styles.modalButtonSpacer} />
             <PrimaryButton label="Cancel" onPress={() => setDeleteOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
 
       <PlanPickerModal visible={planPickerOpen} onClose={() => setPlanPickerOpen(false)} />

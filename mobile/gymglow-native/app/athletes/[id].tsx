@@ -1,3 +1,4 @@
+import { FormSheet } from '@/components/form-sheet';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -259,7 +260,7 @@ export default function AthleteDetailScreen() {
       <PrimaryButton label="Delete athlete" onPress={confirmDeleteAthlete} variant="ghost" loading={deleteAthlete.isPending} />
 
       <Modal visible={editOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Edit athlete</Text>
             <Text style={styles.modalCopy}>Private name stays inside your account. Public alias is what leaderboard rows can show.</Text>
@@ -271,11 +272,11 @@ export default function AthleteDetailScreen() {
             <View style={{ height: 10 }} />
             <PrimaryButton label="Cancel" onPress={() => setEditOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
 
       <Modal visible={open} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
+        <FormSheet>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Add gymnastics profile</Text>
             <Text style={styles.modalCopy}>Choose the USAG, Xcel, or working level you want GymGlow to use for this athlete.</Text>
@@ -301,7 +302,7 @@ export default function AthleteDetailScreen() {
             <View style={{ height: 10 }} />
             <PrimaryButton label="Cancel" onPress={() => setOpen(false)} variant="ghost" />
           </View>
-        </View>
+        </FormSheet>
       </Modal>
     </Screen>
   );

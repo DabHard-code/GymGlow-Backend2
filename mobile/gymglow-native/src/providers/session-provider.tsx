@@ -1,8 +1,9 @@
+import { Alert } from 'react-native';
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
 import { router } from 'expo-router';
-import { handleAuthDeepLink } from '@/lib/deep-link-auth';
+import { handleAuthDeepLink, isRecoveryLink } from '@/lib/deep-link-auth';
 import { supabase } from '@/lib/supabase';
 import { configureRevenueCat } from '@/lib/revenuecat';
 
@@ -24,9 +25,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
     async function processAuthLink(url: string | null) {
       try {
         await handleAuthDeepLink(url);
-        if (url?.includes('auth/callback')) router.replace('/(tabs)');
+        if (url?.includes('auth/callback')) router.replace(isRecoveryLink(url) ? '/(auth)/reset-password' : '/(tabs)');
       } catch (error) {
         console.warn('Could not finish auth link', error);
+        router.replace('/(auth)/forgot-password');
+        Alert.alert('Reset link unavailable', 'This link may have expired or already been used. Please request a new link.');
       }
     }
 
@@ -43,6 +46,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession ?? null);
+      if (_event === 'PASSWORD_RECOVERY') router.replace('/(auth)/reset-password');
       configureRevenueCat(nextSession?.user.id).catch(console.warn);
       setLoading(false);
     });

@@ -1,5 +1,6 @@
-import { Redirect } from 'expo-router';
+import { ActivityIndicator } from 'react-native';
+import { Screen } from '@/components/screen';
 
 export default function AuthCallback() {
-  return <Redirect href="/(tabs)" />;
+  return <Screen><ActivityIndicator accessibilityLabel="Opening account link" /></Screen>;
 }

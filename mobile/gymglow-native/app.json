@@ -25,7 +25,8 @@
       }
     },
     "android": {
-      "package": "com.gymglow.app"
+      "package": "com.gymglow.app",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro"
