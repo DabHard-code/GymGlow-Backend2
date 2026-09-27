@@ -8,6 +8,8 @@ import {
   jsonb,
   timestamp,
   boolean,
+  date,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -192,6 +194,7 @@ export const feedbackItemSchema = z.object({
 export type FeedbackItem = z.infer<typeof feedbackItemSchema>;
 
 export const analyses = pgTable("analyses", {
+  badgeEvidence: jsonb("badge_evidence").$type<{ eventScores?: Record<string, number>; skills?: string[]; stuckLanding?: boolean }>(),
   isCompetitionEligible: boolean("is_competition_eligible").default(false),
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sessionId: varchar("session_id").notNull().references(() => sessions.id),
@@ -424,6 +427,15 @@ export const badgeProgress = pgTable("badge_progress", {
 });
 
 export type BadgeProgressRow = typeof badgeProgress.$inferSelect;
+
+export const practiceLogs = pgTable('practice_logs', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: varchar('profile_id').notNull().references(() => sportProfiles.id, {onDelete:'cascade'}),
+  kind: text('kind').notNull(),
+  practiceKey: text('practice_key').notNull(),
+  practicedOn: date('practiced_on').notNull().default(sql`CURRENT_DATE`),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, table => [uniqueIndex('practice_logs_profile_day_unique').on(table.profileId, table.kind, table.practiceKey, table.practicedOn)]);
 
 export const drillSkills = pgTable("drill_skills", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),

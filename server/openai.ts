@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { parseBadgeEvidence } from "./badge-rules";
 import type { SportType, FeedbackItem, BadgeType } from "@shared/schema";
 import { badgeTypes } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -107,10 +108,12 @@ function buildSportPrompt(
     "  } > (3-8 items; DO NOT return an empty array),",
     '  "safetyNotes": string[] (0-3 items),',
     '  "progressionTips": string[] (0-4 items),',
+    '  "badgeEvidence": { "eventScores": { "beam"?: number, "floor"?: number, "bars"?: number, "vault"?: number, "landing"?: number, "shape"?: number }, "skills": string[], "stuckLanding": boolean },',
     `  "awardedBadges": string[] (0-3 items; must be from: [${badgeList}])`,
     "}",
     "",
     "Hard requirements:",
+    '- badgeEvidence scores must be 0-100 and only for events or qualities clearly visible. Omit uncertain scores. Include only observed skills. Set stuckLanding true only when the landing and a controlled finish without steps are clearly visible; otherwise false.',
     "- feedback must have at least 3 items.",
     "- Each feedback item must include title, description, improvement, severity.",
     "- At least one feedback item must address a strength, and at least two must address corrections.",
@@ -126,6 +129,7 @@ function buildSportPrompt(
 /* ==================== TYPES ==================== */
 
 export interface AnalysisOutput {
+  badgeEvidence: import('./badge-rules').BadgeEvidence | null;
   overallScore: number;
   summary: string;
   technicalBreakdown: string;
@@ -369,6 +373,7 @@ const parsed = JSON.parse(content);
     ) as BadgeType[];
 
     return {
+      badgeEvidence: parseBadgeEvidence(parsed.badgeEvidence),
       overallScore: Math.max(0, Math.min(100, parsed.overallScore ?? 70)),
       summary: cleanText(parsed.summary, "Analysis complete.", 260),
       technicalBreakdown: cleanText(parsed.technicalBreakdown, "", 900),

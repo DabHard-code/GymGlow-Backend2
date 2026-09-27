@@ -1,0 +1,16 @@
+import 'dotenv/config';
+import {spawnSync} from 'node:child_process';
+import {mkdirSync,statSync} from 'node:fs';
+import path from 'node:path';
+const root=path.join(process.env.LOCALAPPDATA,'GymGlow');
+const dir=path.join(root,'Backups');
+mkdirSync(dir,{recursive:true});
+const file=path.join(dir,`before-badge-rules-${new Date().toISOString().replace(/[:.]/g,'-')}.dump`);
+const url=new URL(process.env.DATABASE_URL);
+const env={...process.env,PGHOST:url.hostname,PGPORT:url.port||'5432',PGUSER:decodeURIComponent(url.username),PGPASSWORD:decodeURIComponent(url.password),PGDATABASE:url.pathname.slice(1),PGSSLMODE:'require'};
+const bin=path.join(root,'Tools','pgsql','bin');
+const result=spawnSync(path.join(bin,'pg_dump.exe'),['--format=custom','--no-owner','--no-acl','--schema=public','--file',file],{env,encoding:'utf8'});
+if(result.status!==0)throw new Error(result.stderr || 'Backup failed');
+const verify=spawnSync(path.join(bin,'pg_restore.exe'),['--list',file],{encoding:'utf8'});
+if(verify.status!==0 || !verify.stdout.includes('TABLE DATA public analyses'))throw new Error('Backup archive verification failed');
+console.log(JSON.stringify({file,bytes:statSync(file).size,archiveReadable:true,scope:'public application schema; not storage video files or auth schema'}));

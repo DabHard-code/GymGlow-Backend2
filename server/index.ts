@@ -176,7 +176,7 @@ app.get("/api/health", (req: Request, res: Response) => {
         "seedBadges",
       ]);
       await storage.backfillBadgeProgressFromLegacy();
-      await storage.backfillEligibleCatalogBadgesFromAnalyses();
+      await (await import("./badge-sync")).syncAllBadgeEvidence();
       console.log("Badge catalog seeded successfully");
     } catch (error) {
       console.error("Error seeding badge catalog:", error);

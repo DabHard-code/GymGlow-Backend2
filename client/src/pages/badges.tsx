@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PracticeLog } from '@/components/practice-log';
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Award, Lock } from "lucide-react";
@@ -307,6 +308,7 @@ const isBadgeEarned = (badge: DbBadge) =>
             </div>
 
             <CompWeekCallout profileId={profileId} />
+            {selectedProfile && <PracticeLog key={selectedProfile.id} profileId={selectedProfile.id} />}
 
            {tierOrder.map((tier) => {
   const earnedCount = grouped[tier].filter((b) => isBadgeEarned(b)).length;

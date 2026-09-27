@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PracticeLog } from '@/components/practice-log';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,6 +123,7 @@ export default function BadgesTab() {
   return (
     <Screen>
       <SectionTitle title="Badges" subtitle="Milestones earned from uploads, challenge work, and consistent progress." />
+      {selectedProfile && <PracticeLog key={selectedProfile.id} profileId={selectedProfile.id} />}
 
       <GlassCard style={styles.heroCard}>
         <View style={styles.heroIcon}>

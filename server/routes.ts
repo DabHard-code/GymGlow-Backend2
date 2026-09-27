@@ -3,6 +3,8 @@ import { generatedPublicAlias, publicAliasForAthlete } from "../shared/public-al
 import type { Express, NextFunction, Request, Response } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
+import { syncProfileBadges } from "./badge-sync";
+import { pool } from "./db";
 import {
   analysisRequestSchema,
   sportTypes,
@@ -1473,6 +1475,8 @@ app.get("/billing/portal", async (req, res) => {
       result.feedback = await enrichFeedbackWithDrills(sportType, result.feedback);
 
       const analysis = await storage.createAnalysis({
+        badgeEvidence: result.badgeEvidence,
+        isCompetitionEligible: !isTrial && user.plan === "competition",
         sessionId,
         overallScore: result.overallScore,
         summary: result.summary,
@@ -1510,13 +1514,9 @@ app.get("/billing/portal", async (req, res) => {
           .awardCatalogBadgesByShortNames(athleteId, result.awardedBadges)
           .catch(() => undefined);
       }
-      if (!isTrial) {
-        await storage
-          .awardEligibleCatalogBadgesForAnalysis(athleteId, profileId, analysis.id)
-          .catch((err) => console.warn("Catalog badge rule evaluation failed:", err));
-      }
       await removeStoredVideo(videoPath, "analysis");
       await storage.updateSession(sessionId, { status: "ready", videoUrl: null });
+      if (!isTrial) await syncProfileBadges(profileId).catch((err) => console.warn("Catalog badge rule evaluation failed:", err));
     } catch (err) {
       console.error("ANALYSIS ERROR:", err);
 
@@ -1625,9 +1625,49 @@ app.get("/billing/portal", async (req, res) => {
     res.json(rows);
   });
 
+  app.get("/api/profiles/:profileId/practice", async (req, res, next) => {
+    try {
+      const access = await requireProfileAccess(req, res, req.params.profileId);
+      if (!access) return;
+      const { rows: badges } = await pool.query("SELECT criteria_type,criteria_json FROM badges WHERE sport=$1", [access.profile.sport]);
+      const options = new Map<string, { kind: string; key: string; label: string }>();
+      for (const badge of badges) {
+        const c = badge.criteria_json || {};
+        const kind = badge.criteria_type === 'cues_used' || (badge.criteria_type === 'streak' && c.type === 'cues') ? 'cue' : ['drills_logged','drill_count'].includes(badge.criteria_type) ? 'drill' : null;
+        const label = c.cue || c.drill || c.group;
+        if (!kind || !label) continue;
+        const key = String(label).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        options.set(`${kind}:${key}`, { kind, key, label: String(label).replace(/_/g, ' ') });
+      }
+      const { rows: logged } = await pool.query("SELECT kind,practice_key AS key FROM practice_logs WHERE profile_id=$1 AND practiced_on=(now() AT TIME ZONE 'UTC')::date", [access.profile.id]);
+      res.json({ options: Array.from(options.values()), logged });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/profiles/:profileId/practice", async (req, res, next) => {
+    try {
+      const access = await requireProfileAccess(req, res, req.params.profileId);
+      if (!access) return;
+      const parsed = z.object({kind: z.enum(['cue','drill']), key: z.string().min(1).max(80)}).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({error:'Choose a practice item.'});
+      const {kind,key} = parsed.data;
+      const {rows} = await pool.query("SELECT criteria_type,criteria_json FROM badges WHERE sport=$1", [access.profile.sport]);
+      const valid = rows.some(b => {
+        const c=b.criteria_json || {};
+        const matchesKind=kind==='cue' ? b.criteria_type==='cues_used' || (b.criteria_type==='streak' && c.type==='cues') : ['drills_logged','drill_count'].includes(b.criteria_type);
+        return matchesKind && [c.cue,c.drill,c.group].filter(Boolean).some(v=>String(v).trim().toLowerCase().replace(/[^a-z0-9]+/g,'_')===key);
+      });
+      if (!valid) return res.status(400).json({error:'Unknown practice item.'});
+      await pool.query("INSERT INTO practice_logs(profile_id,kind,practice_key,practiced_on) VALUES($1,$2,$3,(now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING", [access.profile.id,kind,key]);
+      await syncProfileBadges(access.profile.id);
+      res.json({saved:true});
+    } catch(error) { next(error); }
+  });
+
   // Athlete badge state for the DB-backed catalog.
   // NOTE: We keep compatibility by mapping legacy earned_badges.badge_type to badges.short_name/name.
-  app.get("/api/athletes/:athleteId/badge-progress", async (req, res) => {
+  app.get("/api/athletes/:athleteId/badge-progress", async (req, res, next) => {
+    try {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
@@ -1654,6 +1694,8 @@ app.get("/billing/portal", async (req, res) => {
         )
       : eq(badgesTable.sport, sport as any);
 
+    const profiles = await storage.getProfilesByAthlete(athleteId);
+    for (const profile of profiles.filter(p => p.sport === sport)) await syncProfileBadges(profile.id);
     const catalog = await db.select().from(badgesTable).where(catalogWhere);
 
     // Pull legacy earned badges (badge_type strings).
@@ -1689,10 +1731,12 @@ app.get("/billing/portal", async (req, res) => {
       .from(badgeProgressTable)
       .where(eq(badgeProgressTable.athleteId, athleteId));
 
-    res.json({
-      earnedBadgeIds,
-      progress: progressRows,
-    });
+    const catalogIds = new Set(catalog.map(b => b.id));
+    for (const row of progressRows) {
+      if (catalogIds.has(row.badgeId) && row.progressTarget > 0 && row.progressValue >= row.progressTarget) earnedBadgeIds.push(row.badgeId);
+    }
+    res.json({ earnedBadgeIds: Array.from(new Set(earnedBadgeIds)), progress: progressRows.filter(p => catalogIds.has(p.badgeId)) });
+    } catch (error) { next(error); }
   });
 
   app.get("/api/athletes/:athleteId/badges", async (req, res) => {
@@ -2448,6 +2492,9 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
         and(
           eq(sportProfilesTable.sport, profile.sport),
           eq(sportProfilesTable.level, profile.level),
+          eq(analysesTable.isCompetitionEligible, true),
+          eq(sessionsTable.isTrial, false),
+          eq(sessionsTable.status, "ready"),
           gte(analysesTable.createdAt, weekStart),
           lte(analysesTable.createdAt, weekEnd),
         ),
@@ -2475,13 +2522,13 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
         const second = topScores[1] || 0;
         return { athleteId, avgTop2, best, second, top2 };
       })
-      .filter((x) => x.best > 0)
+      .filter((x) => x.top2.length === 2)
       .sort((a, b) => (b.avgTop2 - a.avgTop2) || (b.best - a.best) || (b.second - a.second));
 
     const top10 = await Promise.all(leaderboard.slice(0, 10).map(async (row, idx) => {
       const athlete = await storage.getAthlete(row.athleteId);
       return {
-        rank: idx + 1,
+        rank: leaderboard.findIndex(r => r.avgTop2 === row.avgTop2 && r.best === row.best) + 1,
         displayName: athlete ? publicAliasForAthlete(athlete) : generatedPublicAlias(row.athleteId),
         avgTop2: Math.round(row.avgTop2 * 10) / 10,
         best: row.best,
@@ -2494,7 +2541,7 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
       : leaderboard.findIndex((r) => r.athleteId === profile.athleteId);
 
     const viewerRow = viewerRowIdx >= 0 ? leaderboard[viewerRowIdx] : null;
-    const rank = viewerRowIdx >= 0 ? viewerRowIdx + 1 : null;
+    const rank = viewerRow ? leaderboard.findIndex(r => r.avgTop2 === viewerRow.avgTop2 && r.best === viewerRow.best) + 1 : null;
     const total = leaderboard.length;
     const percentile = rank ? Math.round(((total - rank) / Math.max(1, total)) * 100) : null;
 
@@ -2504,7 +2551,7 @@ app.get("/api/challenges/:id/leaderboard", async (req, res) => {
       cycleWeek,
       your: viewerRow
   ? {
-      rank: viewerRowIdx + 1,
+      rank: rank!,
       percentile,
       avgTop2: viewerRow.avgTop2,
       best: viewerRow.best,
